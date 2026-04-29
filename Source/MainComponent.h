@@ -7,7 +7,8 @@
     This component lives inside our window, and this is where you should put all
     your controls and content.
 */
-class MainComponent  : public juce::AudioAppComponent
+class MainComponent  : public juce::AudioAppComponent,
+                      public juce::Timer
 {
 public:
     //==============================================================================
@@ -22,11 +23,10 @@ public:
     //==============================================================================
     void paint (juce::Graphics& g) override;
     void resized() override;
+    void timerCallback() override;
 
 private:
-    //==============================================================================
-    // Your private member variables go here...
-
+    float levels[6] = {};
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MainComponent)
 };
