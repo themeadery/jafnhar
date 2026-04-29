@@ -26,7 +26,15 @@ public:
     void timerCallback() override;
 
 private:
-    float levels[6] = {};
+    float inputLevels[6] = {};
+    float outputLevels[6] = {};
+    juce::Random random;
+    juce::ToggleButton noiseToggle;
+    bool noiseEnabled = false;
+	juce::SharedResourcePointer<juce::TooltipWindow> tooltipWindow;
+
+    void processInputChannels (const juce::AudioSourceChannelInfo& bufferToFill);
+    void processOutputChannels (const juce::AudioSourceChannelInfo& bufferToFill);
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MainComponent)
 };
