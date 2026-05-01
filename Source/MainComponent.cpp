@@ -46,31 +46,25 @@ void MainComponent::prepareToPlay (int samplesPerBlockExpected, double sampleRat
     // For more details, see the help for AudioProcessor::prepareToPlay()
 }
 
-void MainComponent::getNextAudioBlock (const juce::AudioSourceChannelInfo& bufferToFill)
+void MainComponent::getNextAudioBlock(const juce::AudioSourceChannelInfo& bufferToFill)
 {
-    processInputChannels (bufferToFill);
-    processOutputChannels (bufferToFill);
-}
 
-void MainComponent::processInputChannels (const juce::AudioSourceChannelInfo& bufferToFill)
-{
+    // process input channels
     for (int ch = 0; ch < 6 && ch < bufferToFill.buffer->getNumChannels(); ++ch)
     {
-        auto* data = bufferToFill.buffer->getReadPointer (ch, bufferToFill.startSample);
+        auto* data = bufferToFill.buffer->getReadPointer(ch, bufferToFill.startSample);
         float peak = 0.0f;
         for (int i = 0; i < bufferToFill.numSamples; ++i)
-            peak = std::max (peak, std::abs (data[i]));
-        inputLevels[ch] = std::max (inputLevels[ch] * 0.95f, peak);
+            peak = std::max(peak, std::abs(data[i]));
+        inputLevels[ch] = std::max(inputLevels[ch] * 0.95f, peak);
     }
-}
 
-void MainComponent::processOutputChannels (const juce::AudioSourceChannelInfo& bufferToFill)
-{
-    float amplitude = std::pow(10.0f, -30.0f / 20.0f);
+    // process output channels
+    float amplitude = std::pow(10.0f, -30.0f / 20.0f); // -30 dBFS amplitude for white noise
 
     for (int ch = 0; ch < bufferToFill.buffer->getNumChannels(); ++ch)
     {
-        auto* outData = bufferToFill.buffer->getWritePointer (ch, bufferToFill.startSample);
+        auto* outData = bufferToFill.buffer->getWritePointer(ch, bufferToFill.startSample);
         float peak = 0.0f;
 
         if (noiseEnabled && (ch == 0 || ch == 1))
@@ -79,7 +73,7 @@ void MainComponent::processOutputChannels (const juce::AudioSourceChannelInfo& b
             {
                 float noise = (random.nextFloat() * 2.0f - 1.0f) * amplitude;
                 outData[i] = noise;
-                peak = std::max (peak, std::abs (noise));
+                peak = std::max(peak, std::abs(noise));
             }
         }
         else
@@ -90,8 +84,9 @@ void MainComponent::processOutputChannels (const juce::AudioSourceChannelInfo& b
             }
         }
 
-        outputLevels[ch] = std::max (outputLevels[ch] * 0.95f, peak);
+        outputLevels[ch] = std::max(outputLevels[ch] * 0.95f, peak);
     }
+
 }
 
 void MainComponent::releaseResources()
@@ -192,7 +187,7 @@ void MainComponent::resized()
     // This is called when the MainContentComponent is resized.
     // If you add any child components, this is where you should
     // update their positions.
-	// This is also called once on initialization, so we can set the initial position of the toggle button here.
+    // This is also called once on initialization, so we can set the initial position of the toggle button here.
     int centerX = getWidth() / 2 - 50;
     int centerY = getHeight() / 2 - 15;
     noiseToggle.setBounds(centerX, centerY, 100, 30);
