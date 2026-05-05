@@ -1,4 +1,5 @@
 #include "MainComponent.h"
+#include "iso226_data.h"
 
 //==============================================================================
 MainComponent::MainComponent()
@@ -11,6 +12,12 @@ MainComponent::MainComponent()
     noiseToggle.setTooltip("-30 dBFS white noise");
     noiseToggle.onClick = [this] { noiseEnabled = noiseToggle.getToggleState(); };
     addAndMakeVisible (noiseToggle);
+
+    iso226Toggle.setButtonText("ISO 226 Filter");
+    iso226Toggle.setTooltip("80 - 60 Phon equal-loudness curve difference");
+    iso226Toggle.setToggleState(true, juce::dontSendNotification); // Default to enabled
+    iso226Toggle.onClick = [this] { iso226Enabled = iso226Toggle.getToggleState(); };
+    addAndMakeVisible(iso226Toggle);
 
     // Some platforms require permissions to open input channels so request that here
     if (juce::RuntimePermissions::isRequired (juce::RuntimePermissions::recordAudio)
@@ -26,6 +33,8 @@ MainComponent::MainComponent()
     }
 
     startTimer (60); // repaint screen every 60ms
+
+    initializeISO226Filter();
 }
 
 MainComponent::~MainComponent()
@@ -84,9 +93,46 @@ void MainComponent::getNextAudioBlock(const juce::AudioSourceChannelInfo& buffer
             }
         }
 
+        if (ch == 0 || ch == 1)
+        {
+            auto* inData = bufferToFill.buffer->getReadPointer(ch + 4, bufferToFill.startSample);
+            auto& buffer = filterBuffers[ch];
+            
+            if (iso226Enabled)
+            {
+                for (int i = 0; i < bufferToFill.numSamples; ++i)
+                {
+                    // Shift buffer and add new sample (circular buffer style)
+                    for (size_t j = buffer.size() - 1; j > 0; --j)
+                    {
+                        buffer[j] = buffer[j - 1];
+                    }
+                    buffer[0] = inData[i];
+                
+                    // Apply FIR convolution: sum(sample[n] * coeff[n])
+                    float filtered = 0.0f;
+                    for (size_t j = 0; j < buffer.size(); ++j)
+                    {
+                        filtered += buffer[j] * firCoefficients[j];
+                    }
+                
+                    outData[i] = filtered;
+                    peak = std::max(peak, std::abs(filtered));
+                }
+            }
+            else
+            {
+                // Pass through unfiltered (bit perfect)
+                for (int i = 0; i < bufferToFill.numSamples; ++i)
+                {
+                    outData[i] = inData[i];
+                    peak = std::max(peak, std::abs(inData[i]));
+                }
+            }
+        }
+
         outputLevels[ch] = std::max(outputLevels[ch] * 0.95f, peak);
     }
-
 }
 
 void MainComponent::releaseResources()
@@ -188,12 +234,46 @@ void MainComponent::resized()
     // If you add any child components, this is where you should
     // update their positions.
     // This is also called once on initialization, so we can set the initial position of the toggle button here.
-    int centerX = getWidth() / 2 - 50;
+    int centerX = getWidth() / 2 - 100;
     int centerY = getHeight() / 2 - 15;
+
     noiseToggle.setBounds(centerX, centerY, 100, 30);
+    iso226Toggle.setBounds(centerX + 110, centerY, 100, 30); // Beside noise toggle
 }
 
 void MainComponent::timerCallback()
 {
     repaint();
+}
+
+void MainComponent::initializeISO226Filter()
+{
+    // Calculate delta: 80 phon - 60 phon (difference in dB)
+    std::array<double, 29> delta;
+    for (size_t i = 0; i < delta.size(); ++i)
+    {
+        delta[i] = iso226::PhonData::phon80[i] - iso226::PhonData::phon60[i];
+    }
+    
+    // Normalize to linear magnitude response (convert dB to linear)
+    // and normalize relative to 1000 Hz (index 17)
+    double refGainDb = delta[17]; // 1000 Hz reference
+    
+    double sum = 0.0;
+    for (size_t i = 0; i < firCoefficients.size(); ++i)
+    {
+        double gainDb = delta[i] - refGainDb; // Normalize
+        firCoefficients[i] = std::pow(10.0f, gainDb / 20.0f); // Convert to linear
+        sum += firCoefficients[i];
+    }
+    
+    // Normalize coefficients to sum to 1.0 (preserve signal level)
+    for (size_t i = 0; i < firCoefficients.size(); ++i)
+    {
+        firCoefficients[i] /= sum;
+    }
+    
+    // Clear filter buffers
+    for (auto& buffer : filterBuffers)
+        buffer.fill(0.0f);
 }

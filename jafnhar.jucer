@@ -4,6 +4,7 @@
               addUsingNamespaceToJuceHeader="0" jucerFormatVersion="1">
   <MAINGROUP id="c5989V" name="jafnhar">
     <GROUP id="{E1B96927-BD32-DBA1-311A-6DD0A425B4D1}" name="Source">
+      <FILE id="jfFGzp" name="iso226_data.h" compile="0" resource="0" file="Source/iso226_data.h"/>
       <FILE id="hNZIuO" name="Main.cpp" compile="1" resource="0" file="Source/Main.cpp"/>
       <FILE id="GIJkHm" name="MainComponent.h" compile="0" resource="0" file="Source/MainComponent.h"/>
       <FILE id="VHpUuH" name="MainComponent.cpp" compile="1" resource="0"

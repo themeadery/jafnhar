@@ -26,11 +26,17 @@ public:
     void timerCallback() override;
 
 private:
+    void initializeISO226Filter();
+
     float inputLevels[6] = {};
     float outputLevels[6] = {};
     juce::Random random;
     juce::ToggleButton noiseToggle;
     bool noiseEnabled = false;
+    juce::ToggleButton iso226Toggle;
+    bool iso226Enabled = true;
+    std::array<float, 29> firCoefficients;
+    std::array<std::array<float, 29>, 6> filterBuffers; // One buffer per channel
     juce::SharedResourcePointer<juce::TooltipWindow> tooltipWindow;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MainComponent)

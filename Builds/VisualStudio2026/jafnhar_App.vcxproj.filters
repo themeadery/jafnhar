@@ -3594,6 +3594,9 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\Source\iso226_data.h">
+      <Filter>jafnhar\Source</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Source\MainComponent.h">
       <Filter>jafnhar\Source</Filter>
     </ClInclude>
