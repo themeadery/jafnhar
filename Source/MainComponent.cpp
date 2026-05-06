@@ -53,6 +53,17 @@ void MainComponent::prepareToPlay (int samplesPerBlockExpected, double sampleRat
     // but be careful - it will be called on the audio thread, not the GUI thread.
 
     // For more details, see the help for AudioProcessor::prepareToPlay()
+
+    juce::dsp::ProcessSpec spec;
+    spec.maximumBlockSize = samplesPerBlockExpected;
+    spec.sampleRate = sampleRate;
+    spec.numChannels = 1;
+
+    firFilterL.prepare(spec);
+    firFilterR.prepare(spec);
+
+    firFilterL.reset();
+    firFilterR.reset();
 }
 
 void MainComponent::getNextAudioBlock(const juce::AudioSourceChannelInfo& bufferToFill)
@@ -96,29 +107,26 @@ void MainComponent::getNextAudioBlock(const juce::AudioSourceChannelInfo& buffer
         if (ch == 0 || ch == 1)
         {
             auto* inData = bufferToFill.buffer->getReadPointer(ch + 4, bufferToFill.startSample);
-            auto& buffer = filterBuffers[ch];
-            
+
             if (iso226Enabled)
             {
+                // Copy input to output and apply FIR filter
                 for (int i = 0; i < bufferToFill.numSamples; ++i)
                 {
-                    // Shift buffer and add new sample (circular buffer style)
-                    for (size_t j = buffer.size() - 1; j > 0; --j)
-                    {
-                        buffer[j] = buffer[j - 1];
-                    }
-                    buffer[0] = inData[i];
-                
-                    // Apply FIR convolution: sum(sample[n] * coeff[n])
-                    float filtered = 0.0f;
-                    for (size_t j = 0; j < buffer.size(); ++j)
-                    {
-                        filtered += buffer[j] * firCoefficients[j];
-                    }
-                
-                    outData[i] = filtered;
-                    peak = std::max(peak, std::abs(filtered));
+                    outData[i] = inData[i];
                 }
+                
+                // Apply FIR filter to just this channel (mono)
+                juce::dsp::AudioBlock<float> block(*bufferToFill.buffer);
+                juce::dsp::ProcessContextReplacing<float> context(block);
+                
+                if (ch == 0)
+                    firFilterL.process(context);
+                else
+                    firFilterR.process(context);
+                
+                for (int i = 0; i < bufferToFill.numSamples; ++i)
+                    peak = std::max(peak, std::abs(outData[i]));
             }
             else
             {
@@ -126,7 +134,7 @@ void MainComponent::getNextAudioBlock(const juce::AudioSourceChannelInfo& buffer
                 for (int i = 0; i < bufferToFill.numSamples; ++i)
                 {
                     outData[i] = inData[i];
-                    peak = std::max(peak, std::abs(inData[i]));
+                    peak = std::max(peak, std::abs(outData[i]));
                 }
             }
         }
@@ -255,9 +263,8 @@ void MainComponent::initializeISO226Filter()
         delta[i] = iso226::PhonData::phon80[i] - iso226::PhonData::phon60[i];
     }
     
-    // Normalize to linear magnitude response (convert dB to linear)
-    // and normalize relative to 1000 Hz (index 17)
-    double refGainDb = delta[17]; // 1000 Hz reference
+    // Normalize to linear magnitude response and relative to 1000 Hz (index 17)
+    double refGainDb = delta[17];
     
     double sum = 0.0;
     for (size_t i = 0; i < firCoefficients.size(); ++i)
@@ -267,13 +274,13 @@ void MainComponent::initializeISO226Filter()
         sum += firCoefficients[i];
     }
     
-    // Normalize coefficients to sum to 1.0 (preserve signal level)
+    // Normalize coefficients to sum to 1.0
     for (size_t i = 0; i < firCoefficients.size(); ++i)
     {
         firCoefficients[i] /= sum;
     }
     
-    // Clear filter buffers
-    for (auto& buffer : filterBuffers)
-        buffer.fill(0.0f);
+    // Set coefficients for both filters
+    firFilterL.coefficients = juce::dsp::FIR::Coefficients<float>::Ptr(new juce::dsp::FIR::Coefficients<float>(firCoefficients.data(), firCoefficients.size()));
+    firFilterR.coefficients = juce::dsp::FIR::Coefficients<float>::Ptr(new juce::dsp::FIR::Coefficients<float>(firCoefficients.data(), firCoefficients.size()));
 }

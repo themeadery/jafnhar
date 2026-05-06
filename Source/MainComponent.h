@@ -1,6 +1,7 @@
 #pragma once
 
 #include <JuceHeader.h>
+#include <juce_dsp/juce_dsp.h>
 
 //==============================================================================
 /*
@@ -36,7 +37,7 @@ private:
     juce::ToggleButton iso226Toggle;
     bool iso226Enabled = true;
     std::array<float, 29> firCoefficients;
-    std::array<std::array<float, 29>, 6> filterBuffers; // One buffer per channel
+    juce::dsp::FIR::Filter<float> firFilterL, firFilterR; // One per channel
     juce::SharedResourcePointer<juce::TooltipWindow> tooltipWindow;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MainComponent)
