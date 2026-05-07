@@ -31,9 +31,6 @@ private:
 
     float inputLevels[6] = {};
     float outputLevels[6] = {};
-    juce::Random random;
-    juce::ToggleButton noiseToggle;
-    bool noiseEnabled = false;
     juce::ToggleButton iso226Toggle;
     bool iso226Enabled = true;
     std::array<float, 29> firCoefficients;
