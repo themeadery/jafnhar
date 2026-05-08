@@ -28,8 +28,6 @@ MainComponent::MainComponent()
     }
 
     startTimer (60); // repaint screen every 60ms
-
-    initializeISO226Filter();
 }
 
 MainComponent::~MainComponent()
@@ -48,6 +46,8 @@ void MainComponent::prepareToPlay (int samplesPerBlockExpected, double sampleRat
     // but be careful - it will be called on the audio thread, not the GUI thread.
 
     // For more details, see the help for AudioProcessor::prepareToPlay()
+
+    initializeISO226Filter(sampleRate);
 
     juce::dsp::ProcessSpec spec;
     spec.maximumBlockSize = samplesPerBlockExpected;
@@ -222,18 +222,18 @@ void MainComponent::timerCallback()
     repaint();
 }
 
-void MainComponent::initializeISO226Filter()
+void MainComponent::initializeISO226Filter(double sampleRate)
 {
     // Calculate delta: 80 phon - 60 phon (difference in dB)
     std::array<double, 29> delta;
     for (size_t i = 0; i < delta.size(); ++i)
     {
         delta[i] = iso226::PhonData::phon80[i] - iso226::PhonData::phon60[i];
-    }
-    
+                }
+
     // Normalize to linear magnitude response and relative to 1000 Hz (index 17)
     double refGainDb = delta[17];
-    
+
     double sum = 0.0;
     for (size_t i = 0; i < firCoefficients.size(); ++i)
     {

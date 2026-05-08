@@ -27,13 +27,13 @@ public:
     void timerCallback() override;
 
 private:
-    void initializeISO226Filter();
+    void initializeISO226Filter(double sampleRate);
 
     float inputLevels[6] = {};
     float outputLevels[6] = {};
     juce::ToggleButton iso226Toggle;
     bool iso226Enabled = true;
-    std::array<float, 29> firCoefficients;
+    std::array<float, 29> firCoefficients = {}; // needs to be 1024+ in future versions
     juce::dsp::FIR::Filter<float> firFilterL, firFilterR; // One per channel
     juce::SharedResourcePointer<juce::TooltipWindow> tooltipWindow;
 
