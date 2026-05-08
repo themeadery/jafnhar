@@ -76,6 +76,7 @@ void MainComponent::getNextAudioBlock(const juce::AudioSourceChannelInfo& buffer
     for (int ch = 0; ch < 6; ++ch)
     {
         auto* out = bufferToFill.buffer->getWritePointer(ch, bufferToFill.startSample);
+        juce::dsp::AudioBlock<float> block(*bufferToFill.buffer); // block contains all channels
         float peak = 0.0f;
         if (ch == 0)
         {
@@ -83,9 +84,9 @@ void MainComponent::getNextAudioBlock(const juce::AudioSourceChannelInfo& buffer
             juce::FloatVectorOperations::copy(out, in, bufferToFill.numSamples);
             if (iso226Enabled)
             {
-                juce::dsp::AudioBlock<float> block(*bufferToFill.buffer);
-                juce::dsp::ProcessContextReplacing<float> context(block);
-                firFilterL.process(context); // this channel seems to be the only one that is actually being processed by the FIR filter, why?
+                auto singleChannelBlock = block.getSingleChannelBlock(ch); // gets just channel 0
+                juce::dsp::ProcessContextReplacing<float> context(singleChannelBlock);
+                firFilterL.process(context);
             }
             for (int i = 0; i < bufferToFill.numSamples; ++i)
                 peak = std::max(peak, std::abs(out[i]));
@@ -96,9 +97,9 @@ void MainComponent::getNextAudioBlock(const juce::AudioSourceChannelInfo& buffer
             juce::FloatVectorOperations::copy(out, in, bufferToFill.numSamples);
             if (iso226Enabled)
             {
-                juce::dsp::AudioBlock<float> block(*bufferToFill.buffer);
-                juce::dsp::ProcessContextReplacing<float> context(block);
-                firFilterR.process(context); // this channel seems unaffected when the FIR filter is toggled on
+                auto singleChannelBlock = block.getSingleChannelBlock(ch); // gets just channel 1
+                juce::dsp::ProcessContextReplacing<float> context(singleChannelBlock);
+                firFilterR.process(context);
             }
             for (int i = 0; i < bufferToFill.numSamples; ++i)
                 peak = std::max(peak, std::abs(out[i]));
@@ -240,14 +241,17 @@ void MainComponent::initializeISO226Filter()
         firCoefficients[i] = std::pow(10.0f, gainDb / 20.0f); // Convert to linear
         sum += firCoefficients[i];
     }
-    
+
     // Normalize coefficients to sum to 1.0
     for (size_t i = 0; i < firCoefficients.size(); ++i)
     {
         firCoefficients[i] /= sum;
     }
-    
+
+    // filter needs to extend out past 12,500 Hz, since it is lowpass filters only when it is enabled all the high freq info is lost
+    // also we need more "taps"
+
     // Set coefficients for both filters
-    firFilterL.coefficients = juce::dsp::FIR::Coefficients<float>::Ptr(new juce::dsp::FIR::Coefficients<float>(firCoefficients.data(), firCoefficients.size()));
+    firFilterL.coefficients = juce::dsp::FIR::Coefficients<float>::Ptr(new juce::dsp::FIR::Coefficients<float>(firCoefficients.data(), firCoefficients.size())); // these should be defined in the header and assigned differently
     firFilterR.coefficients = juce::dsp::FIR::Coefficients<float>::Ptr(new juce::dsp::FIR::Coefficients<float>(firCoefficients.data(), firCoefficients.size()));
 }
