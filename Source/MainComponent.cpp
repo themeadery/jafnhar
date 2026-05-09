@@ -225,11 +225,9 @@ void MainComponent::timerCallback()
 void MainComponent::initializeISO226Filter(double sampleRate)
 {
     // Calculate delta: 80 phon - 60 phon (difference in dB)
-    std::array<double, 29> delta;
+    std::array<double, 29> delta = {};
     for (size_t i = 0; i < delta.size(); ++i)
-    {
         delta[i] = iso226::PhonData::phon80[i] - iso226::PhonData::phon60[i];
-                }
 
     // Normalize to linear magnitude response and relative to 1000 Hz (index 17)
     double refGainDb = delta[17];
@@ -244,9 +242,7 @@ void MainComponent::initializeISO226Filter(double sampleRate)
 
     // Normalize coefficients to sum to 1.0
     for (size_t i = 0; i < firCoefficients.size(); ++i)
-    {
         firCoefficients[i] /= sum;
-    }
 
     // filter needs to extend out past 12,500 Hz, since it is lowpass filters only when it is enabled all the high freq info is lost
     // also we need more "taps"
