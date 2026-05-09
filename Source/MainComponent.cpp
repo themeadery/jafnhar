@@ -224,30 +224,41 @@ void MainComponent::timerCallback()
 
 void MainComponent::initializeISO226Filter(double sampleRate)
 {
-    // Calculate delta: 80 phon - 60 phon (difference in dB)
-    std::array<double, 29> delta = {};
-    for (size_t i = 0; i < delta.size(); ++i)
-        delta[i] = iso226::PhonData::phon80[i] - iso226::PhonData::phon60[i];
+    // Extend frequencies to Nyquist following the ISO 226 pattern
+    double nyquist = sampleRate / 2.0;
+    std::vector<double> frequencies(iso226::frequencies.begin(), iso226::frequencies.end());
+    std::vector<double> delta;
 
-    // Normalize to linear magnitude response and relative to 1000 Hz (index 17)
-    double refGainDb = delta[17];
+    for (size_t i = 0; i < 29; ++i)
+        delta.push_back(iso226::PhonData::phon80[i] - iso226::PhonData::phon60[i]);
 
-    double sum = 0.0;
-    for (size_t i = 0; i < firCoefficients.size(); ++i)
-    {
-        double gainDb = delta[i] - refGainDb; // Normalize
-        firCoefficients[i] = std::pow(10.0f, gainDb / 20.0f); // Convert to linear
-        sum += firCoefficients[i];
+    // Continue pattern
+    double ratio = std::pow(10.0, 0.1);
+    double freq = iso226::frequencies[28];
+
+    while (freq * ratio <= nyquist) {
+        freq *= ratio;
+        frequencies.push_back(freq);
+        delta.push_back(delta[28]); // Hold 12,500 Hz value
     }
 
-    // Normalize coefficients to sum to 1.0
-    for (size_t i = 0; i < firCoefficients.size(); ++i)
-        firCoefficients[i] /= sum;
+    // not even sure how to explain this, vector is of size 29 + nyquist
+    std::vector<float> coeffs(frequencies.size());
 
-    // filter needs to extend out past 12,500 Hz, since it is lowpass filters only when it is enabled all the high freq info is lost
-    // also we need more "taps"
+    // Normalize to linear magnitude response relative to 1000 Hz
+    double refGainDb = delta[17];
+    double sum = 0.0;
+
+    for (size_t i = 0; i < coeffs.size(); ++i) {
+        double gainDb = delta[i] - refGainDb;
+        coeffs[i] = std::pow(10.0f, gainDb / 20.0f);
+        sum += coeffs[i];
+    }
+
+    for (size_t i = 0; i < coeffs.size(); ++i)
+        coeffs[i] /= sum;
 
     // Set coefficients for both filters
-    firFilterL.coefficients = juce::dsp::FIR::Coefficients<float>::Ptr(new juce::dsp::FIR::Coefficients<float>(firCoefficients.data(), firCoefficients.size())); // these should be defined in the header and assigned differently
-    firFilterR.coefficients = juce::dsp::FIR::Coefficients<float>::Ptr(new juce::dsp::FIR::Coefficients<float>(firCoefficients.data(), firCoefficients.size()));
+    firFilterL.coefficients = juce::dsp::FIR::Coefficients<float>::Ptr(new juce::dsp::FIR::Coefficients<float>(coeffs.data(), coeffs.size()));
+    firFilterR.coefficients = juce::dsp::FIR::Coefficients<float>::Ptr(new juce::dsp::FIR::Coefficients<float>(coeffs.data(), coeffs.size()));
 }
