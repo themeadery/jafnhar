@@ -235,20 +235,18 @@ void MainComponent::initializeISO226Filter(double sampleRate)
     // Continue pattern
     double ratio = std::pow(10.0, 0.1);
     double freq = iso226::frequencies[28];
-
     while (freq * ratio <= nyquist) {
         freq *= ratio;
         frequencies.push_back(freq);
         delta.push_back(delta[28]); // Hold 12,500 Hz value
     }
 
-    // not even sure how to explain this, vector is of size 29 + nyquist
+    // not even sure how to explain this, vector is of size 29 + up to nyquist
     std::vector<float> coeffs(frequencies.size());
 
     // Normalize to linear magnitude response relative to 1000 Hz
     double refGainDb = delta[17];
     double sum = 0.0;
-
     for (size_t i = 0; i < coeffs.size(); ++i) {
         double gainDb = delta[i] - refGainDb;
         coeffs[i] = std::pow(10.0f, gainDb / 20.0f);
