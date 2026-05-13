@@ -9,7 +9,7 @@ MainComponent::MainComponent()
     setSize (854, 358);
 
     iso226Toggle.setButtonText("ISO 226 Filter");
-    iso226Toggle.setTooltip("80 - 60 Phon equal-loudness curve difference");
+    iso226Toggle.setTooltip("60 - 80 Phon delta");
     iso226Toggle.setToggleState(true, juce::dontSendNotification); // Default to enabled
     iso226Toggle.onClick = [this] { iso226Enabled = iso226Toggle.getToggleState(); };
     addAndMakeVisible(iso226Toggle);
@@ -39,26 +39,14 @@ MainComponent::~MainComponent()
 //==============================================================================
 void MainComponent::prepareToPlay (int samplesPerBlockExpected, double sampleRate)
 {
-    // This function will be called when the audio device is started, or when
-    // its settings (i.e. sample rate, block size, etc) are changed.
-
-    // You can use this function to initialise any resources you might need,
-    // but be careful - it will be called on the audio thread, not the GUI thread.
-
-    // For more details, see the help for AudioProcessor::prepareToPlay()
-
-    initializeISO226Filter(sampleRate);
-
-    juce::dsp::ProcessSpec spec;
-    spec.maximumBlockSize = samplesPerBlockExpected;
     spec.sampleRate = sampleRate;
+    spec.maximumBlockSize = samplesPerBlockExpected;
     spec.numChannels = 1;
 
-    firFilterL.prepare(spec);
-    firFilterR.prepare(spec);
+    convolutionL.prepare(spec);
+    convolutionR.prepare(spec);
 
-    firFilterL.reset();
-    firFilterR.reset();
+    initializeISO226Filter(sampleRate);
 }
 
 void MainComponent::getNextAudioBlock(const juce::AudioSourceChannelInfo& bufferToFill)
@@ -84,9 +72,9 @@ void MainComponent::getNextAudioBlock(const juce::AudioSourceChannelInfo& buffer
             juce::FloatVectorOperations::copy(out, in, bufferToFill.numSamples);
             if (iso226Enabled)
             {
-                auto singleChannelBlock = block.getSingleChannelBlock(ch); // gets just channel 0
+                auto singleChannelBlock = block.getSingleChannelBlock(0); // gets just channel 0
                 juce::dsp::ProcessContextReplacing<float> context(singleChannelBlock);
-                firFilterL.process(context);
+                convolutionL.process(context);
             }
             for (int i = 0; i < bufferToFill.numSamples; ++i)
                 peak = std::max(peak, std::abs(out[i]));
@@ -97,9 +85,9 @@ void MainComponent::getNextAudioBlock(const juce::AudioSourceChannelInfo& buffer
             juce::FloatVectorOperations::copy(out, in, bufferToFill.numSamples);
             if (iso226Enabled)
             {
-                auto singleChannelBlock = block.getSingleChannelBlock(ch); // gets just channel 1
+                auto singleChannelBlock = block.getSingleChannelBlock(1); // gets just channel 1
                 juce::dsp::ProcessContextReplacing<float> context(singleChannelBlock);
-                firFilterR.process(context);
+                convolutionR.process(context);
             }
             for (int i = 0; i < bufferToFill.numSamples; ++i)
                 peak = std::max(peak, std::abs(out[i]));
@@ -224,39 +212,82 @@ void MainComponent::timerCallback()
 
 void MainComponent::initializeISO226Filter(double sampleRate)
 {
-    // Extend frequencies to Nyquist following the ISO 226 pattern
+    // 1. Calculate the ISO 226 Magnitude Curve
     double nyquist = sampleRate / 2.0;
     std::vector<double> frequencies(iso226::frequencies.begin(), iso226::frequencies.end());
     std::vector<double> delta;
 
     for (size_t i = 0; i < 29; ++i)
-        delta.push_back(iso226::PhonData::phon80[i] - iso226::PhonData::phon60[i]);
+        delta.push_back(iso226::PhonData::phon60[i] - iso226::PhonData::phon80[i]);
 
-    // Continue pattern
     double ratio = std::pow(10.0, 0.1);
     double freq = iso226::frequencies[28];
     while (freq * ratio <= nyquist) {
         freq *= ratio;
         frequencies.push_back(freq);
-        delta.push_back(delta[28]); // Hold 12,500 Hz value
+        delta.push_back(delta[28]); // supposed to hold the 12.5 kHz value out to nyquist, but might calculate a value just over nyquist and thus not include it, skewing the curve
+                                    // should probably manually map the last value to nyquist (24 kHz for 48 kHz sampleRate) or add interpolated values to iso226_data.h up to nyquist for common sample rates
     }
 
-    // not even sure how to explain this, vector is of size 29 + up to nyquist
-    std::vector<float> coeffs(frequencies.size());
+    // 2. Prepare for programmatic Impulse Response generation
+    const int fftOrder = 11; // 2^11 = 2048 taps
+    juce::dsp::FFT fft(fftOrder);
+    const int numTaps = fft.getSize();
 
-    // Normalize to linear magnitude response relative to 1000 Hz
-    double refGainDb = delta[17];
-    double sum = 0.0;
-    for (size_t i = 0; i < coeffs.size(); ++i) {
-        double gainDb = delta[i] - refGainDb;
-        coeffs[i] = std::pow(10.0f, gainDb / 20.0f);
-        sum += coeffs[i];
+    std::vector<juce::dsp::Complex<float>> freqDomain(numTaps);
+    std::vector<juce::dsp::Complex<float>> timeDomain(numTaps);
+    double refGainDb = delta[17]; // 1000 Hz reference
+
+    // 3. Map Magnitudes to FFT Bins
+    for (int i = 0; i <= numTaps / 2; ++i) {
+        double binFreq = (double)i * sampleRate / numTaps;
+
+        auto it = std::lower_bound(frequencies.begin(), frequencies.end(), binFreq);
+        size_t idx = std::distance(frequencies.begin(), it);
+        idx = std::min(idx, delta.size() - 1);
+
+        double gainDb = delta[idx] - refGainDb;
+        float magnitude = std::pow(10.0f, (float)gainDb / 20.0f);
+
+        freqDomain[i] = { magnitude, 0.0f };
+        if (i > 0 && i < numTaps / 2)
+            freqDomain[numTaps - i] = { magnitude, 0.0f };
     }
 
-    for (size_t i = 0; i < coeffs.size(); ++i)
-        coeffs[i] /= sum;
+    // 4. Transform to Time Domain (Inverse FFT)
+    fft.perform(freqDomain.data(), timeDomain.data(), true);
 
-    // Set coefficients for both filters
-    firFilterL.coefficients = juce::dsp::FIR::Coefficients<float>::Ptr(new juce::dsp::FIR::Coefficients<float>(coeffs.data(), coeffs.size()));
-    firFilterR.coefficients = juce::dsp::FIR::Coefficients<float>::Ptr(new juce::dsp::FIR::Coefficients<float>(coeffs.data(), coeffs.size()));
+    // 5. Center (Linear Phase), Window, and Normalize
+    std::vector<float> impulse(numTaps);
+    for (int i = 0; i < numTaps; ++i)
+        impulse[(i + numTaps / 2) % numTaps] = timeDomain[i].real();
+
+    // Create the windowing function object
+    juce::dsp::WindowingFunction<float> window(numTaps, juce::dsp::WindowingFunction<float>::hamming);
+
+    // Apply it to the data
+    window.multiplyWithWindowingTable(impulse.data(), numTaps);
+
+    float sum = 0.0f;
+    for (auto c : impulse) sum += std::abs(c);
+    for (auto& c : impulse) c /= sum;
+
+    // 1. Create the buffer
+    juce::AudioBuffer<float> irBuffer(1, (int)impulse.size());
+    irBuffer.copyFrom(0, 0, impulse.data(), (int)impulse.size());
+
+    // 2. Define the lambda to accept a buffer by value
+    auto loadIR = [&](juce::dsp::Convolution& conv, juce::AudioBuffer<float> bufferToUse) {
+        conv.loadImpulseResponse(
+            std::move(bufferToUse),
+            sampleRate,
+            juce::dsp::Convolution::Stereo::no,
+            juce::dsp::Convolution::Trim::no,
+            juce::dsp::Convolution::Normalise::no
+        );
+        };
+
+    // 3. Load them
+    loadIR(convolutionL, irBuffer);            // Pass a COPY to the Left channel
+    loadIR(convolutionR, std::move(irBuffer)); // Let the Right channel OWN the original
 }

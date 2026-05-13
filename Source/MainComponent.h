@@ -33,7 +33,8 @@ private:
     float outputLevels[6] = {};
     juce::ToggleButton iso226Toggle;
     bool iso226Enabled = true;
-    juce::dsp::FIR::Filter<float> firFilterL, firFilterR; // One per channel
+    juce::dsp::ProcessSpec spec;
+    juce::dsp::Convolution convolutionL, convolutionR;
     juce::SharedResourcePointer<juce::TooltipWindow> tooltipWindow;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MainComponent)
