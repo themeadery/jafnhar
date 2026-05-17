@@ -220,20 +220,25 @@ void MainComponent::initializeISO226Filter(double sampleRate)
     for (size_t i = 0; i < 29; ++i)
         delta.push_back(iso226::PhonData::phon60[i] - iso226::PhonData::phon80[i]);
 
-    double ratio = std::pow(10.0, 0.1);
-    double freq = iso226::frequencies[28];
-    while (freq * ratio <= nyquist) {
-        freq *= ratio;
-        frequencies.push_back(freq);
-        delta.push_back(delta[28]); // supposed to hold the 12.5 kHz value out to nyquist, but might calculate a value just over nyquist and thus not include it, skewing the curve
-                                    // should probably manually map the last value to nyquist (24 kHz for 48 kHz sampleRate) or add interpolated values to iso226_data.h up to nyquist for common sample rates
+    // Store the last valid delta value (12.5 kHz) to extend toward Nyquist
+    double extensionDelta = delta.back();
+    for (double xf : iso226::xfreqs) {
+        if (xf > nyquist)
+            break; // stop if the extended frequency exceeds Nyquist
+        frequencies.push_back(xf); // add extended frequencies with R10 spacing
+        delta.push_back(extensionDelta); // hold the last delta value constant for frequencies beyond 12.5 kHz
+    }
+
+    // Always add a point at nyquist
+    if (frequencies.back() < nyquist) {
+        frequencies.push_back(nyquist);
+        delta.push_back(extensionDelta);
     }
 
     // 2. Prepare for programmatic Impulse Response generation
     const int fftOrder = 11; // 2^11 = 2048 taps
     juce::dsp::FFT fft(fftOrder);
     const int numTaps = fft.getSize();
-
     std::vector<juce::dsp::Complex<float>> freqDomain(numTaps);
     std::vector<juce::dsp::Complex<float>> timeDomain(numTaps);
     double refGainDb = delta[17]; // 1000 Hz reference

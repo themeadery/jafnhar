@@ -15,6 +15,21 @@ namespace iso226 {
     };
 
     /**
+     * @brief Extended preferred frequencies (Hz) using R10 spacing.
+     */
+    inline constexpr std::array<double, 9> xfreqs = {
+        16000.0,  // (1.25 * 10^4) -> 16,000
+        20000.0,  // (2.0 * 10^4)  -> 20,000
+        25000.0,  // (2.5 * 10^4)  -> 25,000
+        31500.0,  // (3.15 * 10^4) -> 31,500
+        40000.0,  // (4.0 * 10^4)  -> 40,000
+        50000.0,  // (5.0 * 10^4)  -> 50,000
+        63000.0,  // (6.3 * 10^4)  -> 63,000
+        80000.0,  // (8.0 * 10^4)  -> 80,000
+        100000.0  // (1.0 * 10^5)  -> 100,000
+    };
+
+    /**
     * @struct PhonData
     * @brief Pre-calculated Sound Pressure Level (SPL) values in dB for various phon levels.
     * * Use these as target magnitudes for FIR filter design. Values are absolute SPL;
