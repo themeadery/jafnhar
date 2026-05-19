@@ -37,5 +37,9 @@ private:
     juce::dsp::Convolution convolutionL, convolutionR;
     juce::SharedResourcePointer<juce::TooltipWindow> tooltipWindow;
 
+    std::vector<float> freqRespFrequencies;
+    std::vector<float> freqRespDb;
+    double nyquist = 0.0;
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MainComponent)
 };
