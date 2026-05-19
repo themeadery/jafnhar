@@ -8,11 +8,58 @@ MainComponent::MainComponent()
     // you add any child components.
     setSize (1280, 536);
 
-    iso226Toggle.setButtonText("ISO 226 Filter");
-    iso226Toggle.setTooltip("60 - 80 Phon delta");
+    iso226Toggle.setButtonText("Filter Toggle");
     iso226Toggle.setToggleState(true, juce::dontSendNotification); // Default to enabled
     iso226Toggle.onClick = [this] { iso226Enabled = iso226Toggle.getToggleState(); };
     addAndMakeVisible(iso226Toggle);
+
+    auto setupPhonLabel = [](juce::Label& label, const juce::String& text) {
+        label.setText(text, juce::dontSendNotification);
+        label.setJustificationType(juce::Justification::centred);
+        label.setFont(juce::FontOptions(13.0f));
+        label.setColour(juce::Label::textColourId, juce::Colours::lightgrey);
+    };
+
+    sourcePhonSlider.setSliderStyle(juce::Slider::RotaryVerticalDrag);
+    sourcePhonSlider.setRange(0, 2, 1);
+    sourcePhonSlider.setValue(1, juce::dontSendNotification);
+    sourcePhonSlider.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
+    sourcePhonSlider.onValueChange = [this] {
+        sourcePhonIdx = juce::roundToInt(sourcePhonSlider.getValue());
+        static const char* phonLabels[] = { "40", "60", "80" };
+        sourcePhonLabel.setText(phonLabels[sourcePhonIdx], juce::dontSendNotification);
+        updateFreqResponse(currentSampleRate);
+        repaint();
+    };
+    sourcePhonSlider.onDragEnd = [this] { rebuildFilter(); };
+    addAndMakeVisible(sourcePhonSlider);
+    setupPhonLabel(sourcePhonLabel, "60");
+    addAndMakeVisible(sourcePhonLabel);
+
+    setupPhonLabel(sourceTitle, "Source");
+    addAndMakeVisible(sourceTitle);
+
+    targetPhonSlider.setSliderStyle(juce::Slider::RotaryVerticalDrag);
+    targetPhonSlider.setRange(0, 2, 1);
+    targetPhonSlider.setValue(2, juce::dontSendNotification);
+    targetPhonSlider.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
+    targetPhonSlider.onValueChange = [this] {
+        targetPhonIdx = juce::roundToInt(targetPhonSlider.getValue());
+        static const char* phonLabels[] = { "40", "60", "80" };
+        targetPhonLabel.setText(phonLabels[targetPhonIdx], juce::dontSendNotification);
+        updateFreqResponse(currentSampleRate);
+        repaint();
+    };
+    targetPhonSlider.onDragEnd = [this] { rebuildFilter(); };
+    addAndMakeVisible(targetPhonSlider);
+    setupPhonLabel(targetPhonLabel, "80");
+    addAndMakeVisible(targetPhonLabel);
+
+    setupPhonLabel(targetTitle, "Target");
+    addAndMakeVisible(targetTitle);
+
+    setupPhonLabel(phonUnitLabel, "phon");
+    addAndMakeVisible(phonUnitLabel);
 
     // Some platforms require permissions to open input channels so request that here
     if (juce::RuntimePermissions::isRequired (juce::RuntimePermissions::recordAudio)
@@ -39,6 +86,7 @@ MainComponent::~MainComponent()
 //==============================================================================
 void MainComponent::prepareToPlay (int samplesPerBlockExpected, double sampleRate)
 {
+    currentSampleRate = sampleRate;
     spec.sampleRate = sampleRate;
     spec.maximumBlockSize = samplesPerBlockExpected;
     spec.numChannels = 1;
@@ -199,7 +247,7 @@ void MainComponent::paint (juce::Graphics& g)
             inputMeterStartX + 6 * spacing + 15,
             meterTop,
             outputMeterStartX - 15 - (inputMeterStartX + 6 * spacing + 15),
-            meterHeight - 40
+            meterHeight - 115
         );
 
         g.setColour(juce::Colours::darkgrey.darker(0.7f));
@@ -251,7 +299,7 @@ void MainComponent::paint (juce::Graphics& g)
             g.strokePath(dashPath, juce::PathStrokeType(0.5f));
 
             g.setColour(juce::Colours::lightgrey);
-            g.drawText(juce::String((int)db), plotBounds.getX() + 2, y - 5, 30, 10, juce::Justification::left);
+            g.drawText(juce::String((int)db), plotBounds.getX() - 32, y - 5, 30, 10, juce::Justification::right);
         }
 
         // Vertical grid lines (REW-style log frequency scale)
@@ -315,7 +363,7 @@ void MainComponent::paint (juce::Graphics& g)
         for (size_t i = 0; i < freqRespFrequencies.size(); ++i)
         {
             float f = freqRespFrequencies[i];
-            float d = freqRespDb[i];
+            float d = iso226Enabled ? freqRespDb[i] : 0.0f;
             if (f < freqMin || f > freqMax) continue;
 
             float px = xForFreq(f);
@@ -345,11 +393,30 @@ void MainComponent::resized()
 
     int plotX = inputMeterStartX + 6 * spacing + 15;
     int plotY = 40;
-    int plotH = meterHeight - 40;
+    int plotH = meterHeight - 115;
 
-    int toggleY = plotY + plotH + 5;
-    int toggleH = 22;
-    iso226Toggle.setBounds(plotX, toggleY, 110, toggleH);
+    int knobY = plotY + plotH + 34;
+    int knobSize = 80;
+    int knobGap = 34;
+
+    int srcKnobX = plotX;
+    int tgtKnobX = plotX + knobSize + knobGap;
+
+    sourcePhonSlider.setBounds(srcKnobX, knobY, knobSize, knobSize);
+    targetPhonSlider.setBounds(tgtKnobX, knobY, knobSize, knobSize);
+
+    int titleY = knobY - 18;
+    int titleH = 16;
+    sourceTitle.setBounds(srcKnobX, titleY, knobSize, titleH);
+    targetTitle.setBounds(tgtKnobX, titleY, knobSize, titleH);
+
+    int labelY = knobY + knobSize + 2;
+    int labelH = 16;
+    sourcePhonLabel.setBounds(srcKnobX, labelY, knobSize, labelH);
+    targetPhonLabel.setBounds(tgtKnobX, labelY, knobSize, labelH);
+    phonUnitLabel.setBounds(srcKnobX + knobSize, labelY, knobGap, labelH);
+
+    iso226Toggle.setBounds(tgtKnobX + knobSize + 25, knobY + 29, 110, 22);
 }
 
 void MainComponent::timerCallback()
@@ -359,38 +426,75 @@ void MainComponent::timerCallback()
 
 void MainComponent::initializeISO226Filter(double sampleRate)
 {
-    // 1. Calculate the ISO 226 Magnitude Curve
+    currentSampleRate = sampleRate;
+    auto impulse = buildIR(sampleRate);
+
+    juce::AudioBuffer<float> irBuffer((int)impulse.size() > 1 ? 1 : 1, (int)impulse.size());
+    irBuffer.copyFrom(0, 0, impulse.data(), (int)impulse.size());
+
+    auto loadIR = [&](juce::dsp::Convolution& conv, juce::AudioBuffer<float> bufferToUse) {
+        conv.loadImpulseResponse(
+            std::move(bufferToUse),
+            sampleRate,
+            juce::dsp::Convolution::Stereo::no,
+            juce::dsp::Convolution::Trim::no,
+            juce::dsp::Convolution::Normalise::no
+        );
+    };
+
+    loadIR(convolutionL, irBuffer);
+    loadIR(convolutionR, std::move(irBuffer));
+}
+
+std::vector<float> MainComponent::buildIR(double sampleRate)
+{
+    if (sourcePhonIdx == targetPhonIdx)
+    {
+        const int halfTaps = 1024;
+        freqRespFrequencies.resize(halfTaps + 1);
+        freqRespDb.resize(halfTaps + 1);
+        for (int i = 0; i <= halfTaps; ++i)
+        {
+            freqRespFrequencies[i] = (float)(i * sampleRate / 2048);
+            freqRespDb[i] = 0.0f;
+        }
+        nyquist = sampleRate / 2.0;
+        return { 1.0f };
+    }
+
     double nyquistRate = sampleRate / 2.0;
     std::vector<double> frequencies(iso226::frequencies.begin(), iso226::frequencies.end());
     std::vector<double> delta;
 
-    for (size_t i = 0; i < 29; ++i)
-        delta.push_back(iso226::PhonData::phon60[i] - iso226::PhonData::phon80[i]);
+    const std::array<double, 29>* phonData[] = {
+        &iso226::PhonData::phon40,
+        &iso226::PhonData::phon60,
+        &iso226::PhonData::phon80
+    };
 
-    // Store the last valid delta value (12.5 kHz) to extend toward Nyquist
+    for (size_t i = 0; i < 29; ++i)
+        delta.push_back((*phonData[sourcePhonIdx])[i] - (*phonData[targetPhonIdx])[i]);
+
     double extensionDelta = delta.back();
     for (double xf : iso226::xfreqs) {
         if (xf > nyquistRate)
-            break; // stop if the extended frequency exceeds Nyquist
-        frequencies.push_back(xf); // add extended frequencies with R10 spacing
-        delta.push_back(extensionDelta); // hold the last delta value constant for frequencies beyond 12.5 kHz
+            break;
+        frequencies.push_back(xf);
+        delta.push_back(extensionDelta);
     }
 
-    // Always add a point at nyquist
     if (frequencies.back() < nyquistRate) {
         frequencies.push_back(nyquistRate);
         delta.push_back(extensionDelta);
     }
 
-    // 2. Prepare for programmatic Impulse Response generation
-    const int fftOrder = 11; // 2^11 = 2048 taps
+    const int fftOrder = 11;
     juce::dsp::FFT fft(fftOrder);
     const int numTaps = fft.getSize();
     std::vector<juce::dsp::Complex<float>> freqDomain(numTaps);
     std::vector<juce::dsp::Complex<float>> timeDomain(numTaps);
-    double refGainDb = delta[17]; // 1000 Hz reference
+    double refGainDb = delta[17];
 
-    // 3. Map Magnitudes to FFT Bins (linear interpolation between ISO points)
     for (int i = 0; i <= numTaps / 2; ++i) {
         double binFreq = (double)i * sampleRate / numTaps;
 
@@ -417,25 +521,19 @@ void MainComponent::initializeISO226Filter(double sampleRate)
             freqDomain[numTaps - i] = { magnitude, 0.0f };
     }
 
-    // 4. Transform to Time Domain (Inverse FFT)
     fft.perform(freqDomain.data(), timeDomain.data(), true);
 
-    // 5. Center (Linear Phase), Window, and Normalize
     std::vector<float> impulse(numTaps);
     for (int i = 0; i < numTaps; ++i)
         impulse[(i + numTaps / 2) % numTaps] = timeDomain[i].real();
 
-    // Create the windowing function object
     juce::dsp::WindowingFunction<float> window(numTaps, juce::dsp::WindowingFunction<float>::hamming);
-
-    // Apply it to the data
     window.multiplyWithWindowingTable(impulse.data(), numTaps);
 
     float sum = 0.0f;
     for (auto c : impulse) sum += std::abs(c);
     for (auto& c : impulse) c /= sum;
 
-    // Capture frequency response for visualization
     const int halfTaps = numTaps / 2;
     freqRespFrequencies.resize(halfTaps + 1);
     freqRespDb.resize(halfTaps + 1);
@@ -452,24 +550,17 @@ void MainComponent::initializeISO226Filter(double sampleRate)
         freqRespDb[i] = 20.0f * std::log10(std::max(std::abs(actualFreq[i]), 1e-30f));
     }
 
-    this->nyquist = nyquistRate;
+    nyquist = nyquistRate;
+    return impulse;
+}
 
-    // 1. Create the buffer
-    juce::AudioBuffer<float> irBuffer(1, (int)impulse.size());
-    irBuffer.copyFrom(0, 0, impulse.data(), (int)impulse.size());
+void MainComponent::updateFreqResponse(double sampleRate)
+{
+    buildIR(sampleRate);
+}
 
-    // 2. Define the lambda to accept a buffer by value
-    auto loadIR = [&](juce::dsp::Convolution& conv, juce::AudioBuffer<float> bufferToUse) {
-        conv.loadImpulseResponse(
-            std::move(bufferToUse),
-            sampleRate,
-            juce::dsp::Convolution::Stereo::no,
-            juce::dsp::Convolution::Trim::no,
-            juce::dsp::Convolution::Normalise::no
-        );
-        };
-
-    // 3. Load them
-    loadIR(convolutionL, irBuffer);            // Pass a COPY to the Left channel
-    loadIR(convolutionR, std::move(irBuffer)); // Let the Right channel OWN the original
+void MainComponent::rebuildFilter()
+{
+    if (currentSampleRate > 0.0)
+        initializeISO226Filter(currentSampleRate);
 }

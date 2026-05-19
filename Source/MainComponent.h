@@ -28,11 +28,24 @@ public:
 
 private:
     void initializeISO226Filter(double sampleRate);
+    void updateFreqResponse(double sampleRate);
+    void rebuildFilter();
+    std::vector<float> buildIR(double sampleRate);
 
     float inputLevels[6] = {};
     float outputLevels[6] = {};
     juce::ToggleButton iso226Toggle;
     bool iso226Enabled = true;
+    juce::Slider sourcePhonSlider;
+    juce::Slider targetPhonSlider;
+    juce::Label sourceTitle;
+    juce::Label targetTitle;
+    juce::Label sourcePhonLabel;
+    juce::Label targetPhonLabel;
+    juce::Label phonUnitLabel;
+    int sourcePhonIdx = 1;
+    int targetPhonIdx = 2;
+    double currentSampleRate = 0.0;
     juce::dsp::ProcessSpec spec;
     juce::dsp::Convolution convolutionL, convolutionR;
     juce::SharedResourcePointer<juce::TooltipWindow> tooltipWindow;
