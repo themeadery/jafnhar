@@ -361,3 +361,6 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+/Builds/VisualStudio2026/plot_freq.py
+/Builds/VisualStudio2026/freq_response.csv
+/AGENTS.md
