@@ -390,15 +390,26 @@ void MainComponent::initializeISO226Filter(double sampleRate)
     std::vector<juce::dsp::Complex<float>> timeDomain(numTaps);
     double refGainDb = delta[17]; // 1000 Hz reference
 
-    // 3. Map Magnitudes to FFT Bins
+    // 3. Map Magnitudes to FFT Bins (linear interpolation between ISO points)
     for (int i = 0; i <= numTaps / 2; ++i) {
         double binFreq = (double)i * sampleRate / numTaps;
 
         auto it = std::lower_bound(frequencies.begin(), frequencies.end(), binFreq);
-        size_t idx = std::distance(frequencies.begin(), it);
-        idx = std::min(idx, delta.size() - 1);
 
-        double gainDb = delta[idx] - refGainDb;
+        double gainDb;
+        if (it == frequencies.begin()) {
+            gainDb = delta[0] - refGainDb;
+        } else if (it == frequencies.end()) {
+            gainDb = delta.back() - refGainDb;
+        } else {
+            size_t idx2 = std::distance(frequencies.begin(), it);
+            size_t idx1 = idx2 - 1;
+            double f1 = frequencies[idx1], f2 = frequencies[idx2];
+            double d1 = delta[idx1], d2 = delta[idx2];
+            double t = (binFreq - f1) / (f2 - f1);
+            gainDb = d1 + t * (d2 - d1) - refGainDb;
+        }
+
         float magnitude = std::pow(10.0f, (float)gainDb / 20.0f);
 
         freqDomain[i] = { magnitude, 0.0f };
