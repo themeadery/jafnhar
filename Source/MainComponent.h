@@ -9,7 +9,8 @@
     your controls and content.
 */
 class MainComponent  : public juce::AudioAppComponent,
-                      public juce::Timer
+                      public juce::Timer,
+                      public juce::MidiInputCallback
 {
 public:
     //==============================================================================
@@ -25,6 +26,7 @@ public:
     void paint (juce::Graphics& g) override;
     void resized() override;
     void timerCallback() override;
+    void handleIncomingMidiMessage(juce::MidiInput* source, const juce::MidiMessage& message) override;
 
 private:
     void initializeISO226Filter(double sampleRate);
@@ -36,6 +38,12 @@ private:
     float outputLevels[6] = {};
     juce::ToggleButton bypassToggle;
     bool bypass = false;
+    std::unique_ptr<juce::MidiInput> midiInput;
+    juce::ComboBox midiDeviceCombo;
+    juce::Label midiDeviceLabel;
+    juce::TextButton sourceLearnBtn{ "L" }, targetLearnBtn{ "L" };
+    int midiSourceCC = -1, midiTargetCC = -1;
+    bool learningForSource = false, learningForTarget = false;
     juce::Slider sourcePhonSlider;
     juce::Slider targetPhonSlider;
     juce::Label sourceTitle;

@@ -61,6 +61,45 @@ MainComponent::MainComponent()
     setupPhonLabel(phonUnitLabel, "phon");
     addAndMakeVisible(phonUnitLabel);
 
+    // MIDI device combo
+    midiDeviceCombo.setTextWhenNoChoicesAvailable("No MIDI inputs");
+    auto midiDevices = juce::MidiInput::getAvailableDevices();
+    for (auto& d : midiDevices)
+        midiDeviceCombo.addItem(d.name, midiDeviceCombo.getNumItems() + 1);
+    midiDeviceCombo.onChange = [this] {
+        auto devices = juce::MidiInput::getAvailableDevices();
+        auto idx = midiDeviceCombo.getSelectedItemIndex();
+        if (idx >= 0 && idx < devices.size()) {
+            midiInput.reset();
+            midiInput = juce::MidiInput::openDevice(devices[idx].identifier, this);
+            if (midiInput)
+                midiInput->start();
+        }
+    };
+    if (midiDeviceCombo.getNumItems() > 0)
+        midiDeviceCombo.setSelectedItemIndex(0);
+    addAndMakeVisible(midiDeviceCombo);
+
+    setupPhonLabel(midiDeviceLabel, "MIDI Device");
+    addAndMakeVisible(midiDeviceLabel);
+
+    // MIDI learn buttons
+    sourceLearnBtn.onClick = [this] {
+        learningForSource = true;
+        learningForTarget = false;
+        sourceLearnBtn.setButtonText("Learn...");
+        targetLearnBtn.setButtonText("L");
+    };
+    addAndMakeVisible(sourceLearnBtn);
+
+    targetLearnBtn.onClick = [this] {
+        learningForTarget = true;
+        learningForSource = false;
+        targetLearnBtn.setButtonText("Learn...");
+        sourceLearnBtn.setButtonText("L");
+    };
+    addAndMakeVisible(targetLearnBtn);
+
     // Some platforms require permissions to open input channels so request that here
     if (juce::RuntimePermissions::isRequired (juce::RuntimePermissions::recordAudio)
         && ! juce::RuntimePermissions::isGranted (juce::RuntimePermissions::recordAudio))
@@ -416,12 +455,59 @@ void MainComponent::resized()
     targetPhonLabel.setBounds(tgtKnobX, labelY, knobSize, labelH);
     phonUnitLabel.setBounds(srcKnobX + knobSize, labelY, knobGap, labelH);
 
-    bypassToggle.setBounds(tgtKnobX + knobSize + 25, knobY + 29, 110, 22);
+    sourceLearnBtn.setBounds(srcKnobX + knobSize + 4, knobY + 30, 28, 20);
+    targetLearnBtn.setBounds(tgtKnobX + knobSize + 4, knobY + 30, 28, 20);
+
+    int rightX = tgtKnobX + knobSize + 40;
+    midiDeviceLabel.setBounds(rightX, knobY + 2, 180, 14);
+    midiDeviceCombo.setBounds(rightX, knobY + 16, 180, 22);
+    bypassToggle.setBounds(rightX, knobY + 44, 110, 22);
 }
 
 void MainComponent::timerCallback()
 {
     repaint();
+}
+
+void MainComponent::handleIncomingMidiMessage(juce::MidiInput*, const juce::MidiMessage& message)
+{
+    if (!message.isController())
+        return;
+
+    auto cc = message.getControllerNumber();
+    auto val = message.getControllerValue();
+
+    if (learningForSource) {
+        juce::MessageManager::callAsync([this, cc] {
+            midiSourceCC = cc;
+            learningForSource = false;
+            sourceLearnBtn.setButtonText("L");
+        });
+        return;
+    }
+    if (learningForTarget) {
+        juce::MessageManager::callAsync([this, cc] {
+            midiTargetCC = cc;
+            learningForTarget = false;
+            targetLearnBtn.setButtonText("L");
+        });
+        return;
+    }
+
+    if (cc == midiSourceCC) {
+        int idx = juce::jlimit(0, 4, juce::roundToInt(val / 127.0f * 4.0f));
+        juce::MessageManager::callAsync([this, idx] {
+            sourcePhonSlider.setValue((double)idx);
+            rebuildFilter();
+        });
+    }
+    if (cc == midiTargetCC) {
+        int idx = juce::jlimit(0, 4, juce::roundToInt(val / 127.0f * 4.0f));
+        juce::MessageManager::callAsync([this, idx] {
+            targetPhonSlider.setValue((double)idx);
+            rebuildFilter();
+        });
+    }
 }
 
 void MainComponent::initializeISO226Filter(double sampleRate)
