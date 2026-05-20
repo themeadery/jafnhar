@@ -34,8 +34,8 @@ private:
 
     float inputLevels[6] = {};
     float outputLevels[6] = {};
-    juce::ToggleButton iso226Toggle;
-    bool iso226Enabled = true;
+    juce::ToggleButton bypassToggle;
+    bool bypass = false;
     juce::Slider sourcePhonSlider;
     juce::Slider targetPhonSlider;
     juce::Label sourceTitle;

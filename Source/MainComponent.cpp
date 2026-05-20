@@ -8,10 +8,10 @@ MainComponent::MainComponent()
     // you add any child components.
     setSize (1280, 536);
 
-    iso226Toggle.setButtonText("Filter Toggle");
-    iso226Toggle.setToggleState(true, juce::dontSendNotification); // Default to enabled
-    iso226Toggle.onClick = [this] { iso226Enabled = iso226Toggle.getToggleState(); };
-    addAndMakeVisible(iso226Toggle);
+    bypassToggle.setButtonText("Bypass");
+    bypassToggle.setToggleState(false, juce::dontSendNotification); // Default to disabled
+    bypassToggle.onClick = [this] { bypass = bypassToggle.getToggleState(); };
+    addAndMakeVisible(bypassToggle);
 
     auto setupPhonLabel = [](juce::Label& label, const juce::String& text) {
         label.setText(text, juce::dontSendNotification);
@@ -118,7 +118,7 @@ void MainComponent::getNextAudioBlock(const juce::AudioSourceChannelInfo& buffer
         {
             auto* in = bufferToFill.buffer->getReadPointer(4, bufferToFill.startSample);
             juce::FloatVectorOperations::copy(out, in, bufferToFill.numSamples);
-            if (iso226Enabled)
+            if (!bypass)
             {
                 auto singleChannelBlock = block.getSingleChannelBlock(0); // gets just channel 0
                 juce::dsp::ProcessContextReplacing<float> context(singleChannelBlock);
@@ -131,7 +131,7 @@ void MainComponent::getNextAudioBlock(const juce::AudioSourceChannelInfo& buffer
         {
             auto* in = bufferToFill.buffer->getReadPointer(5, bufferToFill.startSample);
             juce::FloatVectorOperations::copy(out, in, bufferToFill.numSamples);
-            if (iso226Enabled)
+            if (!bypass)
             {
                 auto singleChannelBlock = block.getSingleChannelBlock(1); // gets just channel 1
                 juce::dsp::ProcessContextReplacing<float> context(singleChannelBlock);
@@ -363,7 +363,7 @@ void MainComponent::paint (juce::Graphics& g)
         for (size_t i = 0; i < freqRespFrequencies.size(); ++i)
         {
             float f = freqRespFrequencies[i];
-            float d = iso226Enabled ? freqRespDb[i] : 0.0f;
+            float d = !bypass ? freqRespDb[i] : 0.0f;
             if (f < freqMin || f > freqMax) continue;
 
             float px = xForFreq(f);
@@ -416,7 +416,7 @@ void MainComponent::resized()
     targetPhonLabel.setBounds(tgtKnobX, labelY, knobSize, labelH);
     phonUnitLabel.setBounds(srcKnobX + knobSize, labelY, knobGap, labelH);
 
-    iso226Toggle.setBounds(tgtKnobX + knobSize + 25, knobY + 29, 110, 22);
+    bypassToggle.setBounds(tgtKnobX + knobSize + 25, knobY + 29, 110, 22);
 }
 
 void MainComponent::timerCallback()
