@@ -21,12 +21,12 @@ MainComponent::MainComponent()
     };
 
     sourcePhonSlider.setSliderStyle(juce::Slider::RotaryVerticalDrag);
-    sourcePhonSlider.setRange(0, 2, 1);
-    sourcePhonSlider.setValue(1, juce::dontSendNotification);
+    sourcePhonSlider.setRange(0, 4, 1);
+    sourcePhonSlider.setValue(2, juce::dontSendNotification);
     sourcePhonSlider.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
     sourcePhonSlider.onValueChange = [this] {
         sourcePhonIdx = juce::roundToInt(sourcePhonSlider.getValue());
-        static const char* phonLabels[] = { "40", "60", "80" };
+        static const char* phonLabels[] = { "20", "40", "60", "80", "100" };
         sourcePhonLabel.setText(phonLabels[sourcePhonIdx], juce::dontSendNotification);
         updateFreqResponse(currentSampleRate);
         repaint();
@@ -40,12 +40,12 @@ MainComponent::MainComponent()
     addAndMakeVisible(sourceTitle);
 
     targetPhonSlider.setSliderStyle(juce::Slider::RotaryVerticalDrag);
-    targetPhonSlider.setRange(0, 2, 1);
-    targetPhonSlider.setValue(2, juce::dontSendNotification);
+    targetPhonSlider.setRange(0, 4, 1);
+    targetPhonSlider.setValue(3, juce::dontSendNotification);
     targetPhonSlider.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
     targetPhonSlider.onValueChange = [this] {
         targetPhonIdx = juce::roundToInt(targetPhonSlider.getValue());
-        static const char* phonLabels[] = { "40", "60", "80" };
+        static const char* phonLabels[] = { "20", "40", "60", "80", "100" };
         targetPhonLabel.setText(phonLabels[targetPhonIdx], juce::dontSendNotification);
         updateFreqResponse(currentSampleRate);
         repaint();
@@ -467,9 +467,11 @@ std::vector<float> MainComponent::buildIR(double sampleRate)
     std::vector<double> delta;
 
     const std::array<double, 29>* phonData[] = {
+        &iso226::PhonData::phon20,
         &iso226::PhonData::phon40,
         &iso226::PhonData::phon60,
-        &iso226::PhonData::phon80
+        &iso226::PhonData::phon80,
+        &iso226::PhonData::phon100
     };
 
     for (size_t i = 0; i < 29; ++i)
