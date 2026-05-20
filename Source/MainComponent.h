@@ -57,6 +57,7 @@ private:
     juce::dsp::ProcessSpec spec;
     juce::dsp::Convolution convolutionL, convolutionR;
     juce::SharedResourcePointer<juce::TooltipWindow> tooltipWindow;
+    juce::ApplicationProperties appProperties;
 
     std::vector<float> freqRespFrequencies;
     std::vector<float> freqRespDb;

@@ -61,6 +61,18 @@ MainComponent::MainComponent()
     setupPhonLabel(phonUnitLabel, "phon");
     addAndMakeVisible(phonUnitLabel);
 
+    // Persistent settings
+    juce::PropertiesFile::Options pOpts;
+    pOpts.applicationName = "jafnhar";
+    pOpts.filenameSuffix = ".settings";
+    pOpts.osxLibrarySubFolder = "Application Support";
+    pOpts.folderName = "jafnhar";
+    appProperties.setStorageParameters(pOpts);
+    auto* props = appProperties.getUserSettings();
+    auto savedDeviceId = props->getValue("midiDeviceId", "");
+    midiSourceCC = props->getIntValue("midiSourceCC", -1);
+    midiTargetCC = props->getIntValue("midiTargetCC", -1);
+
     // MIDI device combo
     midiDeviceCombo.setTextWhenNoChoicesAvailable("No MIDI inputs");
     auto midiDevices = juce::MidiInput::getAvailableDevices();
@@ -74,10 +86,21 @@ MainComponent::MainComponent()
             midiInput = juce::MidiInput::openDevice(devices[idx].identifier, this);
             if (midiInput)
                 midiInput->start();
+            appProperties.getUserSettings()->setValue("midiDeviceId", devices[idx].identifier);
+            appProperties.saveIfNeeded();
         }
     };
-    if (midiDeviceCombo.getNumItems() > 0)
+    if (savedDeviceId.isNotEmpty()) {
+        auto devices = juce::MidiInput::getAvailableDevices();
+        for (int i = 0; i < devices.size(); ++i) {
+            if (devices[i].identifier == savedDeviceId) {
+                midiDeviceCombo.setSelectedItemIndex(i);
+                break;
+            }
+        }
+    } else if (midiDeviceCombo.getNumItems() > 0) {
         midiDeviceCombo.setSelectedItemIndex(0);
+    }
     addAndMakeVisible(midiDeviceCombo);
 
     setupPhonLabel(midiDeviceLabel, "MIDI Device");
@@ -120,6 +143,7 @@ MainComponent::~MainComponent()
 {
     // This shuts down the audio device and clears the audio source.
     shutdownAudio();
+    appProperties.saveIfNeeded();
 }
 
 //==============================================================================
@@ -461,7 +485,7 @@ void MainComponent::resized()
     int rightX = tgtKnobX + knobSize + 40;
     midiDeviceLabel.setBounds(rightX, knobY + 2, 180, 14);
     midiDeviceCombo.setBounds(rightX, knobY + 16, 180, 22);
-    bypassToggle.setBounds(rightX, knobY + 44, 110, 22);
+    bypassToggle.setBounds(rightX, knobY + 60, 110, 22);
 }
 
 void MainComponent::timerCallback()
@@ -482,6 +506,8 @@ void MainComponent::handleIncomingMidiMessage(juce::MidiInput*, const juce::Midi
             midiSourceCC = cc;
             learningForSource = false;
             sourceLearnBtn.setButtonText("L");
+            appProperties.getUserSettings()->setValue("midiSourceCC", midiSourceCC);
+            appProperties.saveIfNeeded();
         });
         return;
     }
@@ -490,6 +516,8 @@ void MainComponent::handleIncomingMidiMessage(juce::MidiInput*, const juce::Midi
             midiTargetCC = cc;
             learningForTarget = false;
             targetLearnBtn.setButtonText("L");
+            appProperties.getUserSettings()->setValue("midiTargetCC", midiTargetCC);
+            appProperties.saveIfNeeded();
         });
         return;
     }
