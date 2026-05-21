@@ -483,9 +483,9 @@ void MainComponent::resized()
     targetLearnBtn.setBounds(tgtKnobX + knobSize + 4, knobY + 30, 28, 20);
 
     int rightX = tgtKnobX + knobSize + 40;
-    midiDeviceLabel.setBounds(rightX, knobY + 2, 180, 14);
-    midiDeviceCombo.setBounds(rightX, knobY + 16, 180, 22);
-    bypassToggle.setBounds(rightX, knobY + 60, 110, 22);
+    midiDeviceLabel.setBounds(rightX, titleY, 180, 14);
+    midiDeviceCombo.setBounds(rightX, titleY + 14, 180, 18);
+    bypassToggle.setBounds(rightX, knobY + 65, 110, 22);
 }
 
 void MainComponent::timerCallback()
