@@ -51,8 +51,8 @@ private:
     juce::Label sourcePhonLabel;
     juce::Label targetPhonLabel;
     juce::Label phonUnitLabel;
-    int sourcePhonIdx = 2;
-    int targetPhonIdx = 3;
+    double sourcePhon = 60.0;
+    double targetPhon = 80.0;
     double currentSampleRate = 0.0;
     juce::dsp::ProcessSpec spec;
     juce::dsp::Convolution convolutionL, convolutionR;

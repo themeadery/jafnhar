@@ -21,13 +21,12 @@ MainComponent::MainComponent()
     };
 
     sourcePhonSlider.setSliderStyle(juce::Slider::RotaryVerticalDrag);
-    sourcePhonSlider.setRange(0, 4, 1);
-    sourcePhonSlider.setValue(2, juce::dontSendNotification);
+    sourcePhonSlider.setRange(20.0, 100.0, 1.0);
+    sourcePhonSlider.setValue(60.0, juce::dontSendNotification);
     sourcePhonSlider.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
     sourcePhonSlider.onValueChange = [this] {
-        sourcePhonIdx = juce::roundToInt(sourcePhonSlider.getValue());
-        static const char* phonLabels[] = { "20", "40", "60", "80", "100" };
-        sourcePhonLabel.setText(phonLabels[sourcePhonIdx], juce::dontSendNotification);
+        sourcePhon = sourcePhonSlider.getValue();
+        sourcePhonLabel.setText(juce::String((int)sourcePhon), juce::dontSendNotification);
         updateFreqResponse(currentSampleRate);
         repaint();
     };
@@ -40,13 +39,12 @@ MainComponent::MainComponent()
     addAndMakeVisible(sourceTitle);
 
     targetPhonSlider.setSliderStyle(juce::Slider::RotaryVerticalDrag);
-    targetPhonSlider.setRange(0, 4, 1);
-    targetPhonSlider.setValue(3, juce::dontSendNotification);
+    targetPhonSlider.setRange(20.0, 100.0, 1.0);
+    targetPhonSlider.setValue(80.0, juce::dontSendNotification);
     targetPhonSlider.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
     targetPhonSlider.onValueChange = [this] {
-        targetPhonIdx = juce::roundToInt(targetPhonSlider.getValue());
-        static const char* phonLabels[] = { "20", "40", "60", "80", "100" };
-        targetPhonLabel.setText(phonLabels[targetPhonIdx], juce::dontSendNotification);
+        targetPhon = targetPhonSlider.getValue();
+        targetPhonLabel.setText(juce::String((int)targetPhon), juce::dontSendNotification);
         updateFreqResponse(currentSampleRate);
         repaint();
     };
@@ -523,14 +521,14 @@ void MainComponent::handleIncomingMidiMessage(juce::MidiInput*, const juce::Midi
     }
 
     if (cc == midiSourceCC) {
-        int idx = juce::jlimit(0, 4, juce::roundToInt(val / 127.0f * 4.0f));
+        int idx = juce::jlimit(20, 100, juce::roundToInt(20.0f + val / 127.0f * 80.0f));
         juce::MessageManager::callAsync([this, idx] {
             sourcePhonSlider.setValue((double)idx);
             rebuildFilter();
         });
     }
     if (cc == midiTargetCC) {
-        int idx = juce::jlimit(0, 4, juce::roundToInt(val / 127.0f * 4.0f));
+        int idx = juce::jlimit(20, 100, juce::roundToInt(20.0f + val / 127.0f * 80.0f));
         juce::MessageManager::callAsync([this, idx] {
             targetPhonSlider.setValue((double)idx);
             rebuildFilter();
@@ -562,7 +560,7 @@ void MainComponent::initializeISO226Filter(double sampleRate)
 
 std::vector<float> MainComponent::buildIR(double sampleRate)
 {
-    if (sourcePhonIdx == targetPhonIdx)
+    if (sourcePhon == targetPhon)
     {
         const int halfTaps = 1024;
         freqRespFrequencies.resize(halfTaps + 1);
@@ -580,16 +578,25 @@ std::vector<float> MainComponent::buildIR(double sampleRate)
     std::vector<double> frequencies(iso226::frequencies.begin(), iso226::frequencies.end());
     std::vector<double> delta;
 
-    const std::array<double, 29>* phonData[] = {
-        &iso226::PhonData::phon20,
-        &iso226::PhonData::phon40,
-        &iso226::PhonData::phon60,
-        &iso226::PhonData::phon80,
-        &iso226::PhonData::phon100
+    auto getSPL = [](int freqIdx, double phon) -> double {
+        const double pVals[] = { 20.0, 40.0, 60.0, 80.0, 100.0 };
+        const std::array<double, 29>* pData[] = {
+            &iso226::PhonData::phon20, &iso226::PhonData::phon40,
+            &iso226::PhonData::phon60, &iso226::PhonData::phon80,
+            &iso226::PhonData::phon100
+        };
+        if (phon <= pVals[0]) return (*pData[0])[freqIdx];
+        if (phon >= pVals[4]) return (*pData[4])[freqIdx];
+        for (int i = 0; i < 4; ++i)
+            if (phon >= pVals[i] && phon <= pVals[i+1]) {
+                double t = (phon - pVals[i]) / (pVals[i+1] - pVals[i]);
+                return (*pData[i])[freqIdx] + t * ((*pData[i+1])[freqIdx] - (*pData[i])[freqIdx]);
+            }
+        return 0.0;
     };
 
     for (size_t i = 0; i < 29; ++i)
-        delta.push_back((*phonData[sourcePhonIdx])[i] - (*phonData[targetPhonIdx])[i]);
+        delta.push_back(getSPL(i, sourcePhon) - getSPL(i, targetPhon));
 
     double extensionDelta = delta.back();
     for (double xf : iso226::xfreqs) {
