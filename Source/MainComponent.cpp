@@ -134,6 +134,19 @@ MainComponent::MainComponent()
         setAudioChannels (6, 6);
     }
 
+    minimiseButton.setButtonText("\xe2\x80\x93");
+    minimiseButton.onClick = [this] {
+        if (auto* rw = findParentComponentOfClass<juce::ResizableWindow>())
+            rw->setMinimised(true);
+    };
+    addAndMakeVisible(minimiseButton);
+
+    closeButton.setButtonText("X");
+    closeButton.onClick = [this] {
+        juce::JUCEApplication::getInstance()->systemRequestedQuit();
+    };
+    addAndMakeVisible(closeButton);
+
     startTimer (60); // repaint screen every 60ms
 }
 
@@ -484,6 +497,22 @@ void MainComponent::resized()
     midiDeviceLabel.setBounds(rightX, titleY, 180, 14);
     midiDeviceCombo.setBounds(rightX, titleY + 14, 180, 18);
     bypassToggle.setBounds(rightX, knobY + 65, 110, 22);
+
+    int btnSize = 20;
+    int btnTop = 8;
+    closeButton.setBounds(getWidth() - btnSize - 8, btnTop, btnSize, btnSize);
+    minimiseButton.setBounds(getWidth() - 2 * btnSize - 12, btnTop, btnSize, btnSize);
+}
+
+void MainComponent::mouseDown(const juce::MouseEvent& event)
+{
+    if (event.y < 40)
+        windowDragger.startDraggingComponent(getTopLevelComponent(), event);
+}
+
+void MainComponent::mouseDrag(const juce::MouseEvent& event)
+{
+    windowDragger.dragComponent(getTopLevelComponent(), event, nullptr);
 }
 
 void MainComponent::timerCallback()
