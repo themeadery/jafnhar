@@ -10,6 +10,9 @@
       <FILE id="GIJkHm" name="MainComponent.h" compile="0" resource="0" file="Source/MainComponent.h"/>
       <FILE id="VHpUuH" name="MainComponent.cpp" compile="1" resource="0"
             file="Source/MainComponent.cpp"/>
+      <FILE id="eqFvKp" name="LogWindow.h" compile="0" resource="0" file="Source/LogWindow.h"/>
+      <FILE id="lPqRnW" name="LogWindow.cpp" compile="1" resource="0"
+            file="Source/LogWindow.cpp"/>
     </GROUP>
   </MAINGROUP>
   <MODULES>
@@ -31,7 +34,7 @@
   <JUCEOPTIONS JUCE_STRICT_REFCOUNTEDPOINTER="1" JUCE_USE_ANDROID_OBOE="0" JUCE_ALSA="0"
                JUCE_DIRECTSOUND="0" JUCE_WASAPI="0" JUCE_ASIO="1"/>
   <EXPORTFORMATS>
-    <VS2026 targetFolder="Builds/VisualStudio2026">
+    <VS2026 targetFolder="Builds/VisualStudio2026" extraSearchPaths="../../Source/third_party/spdlog/include">
       <CONFIGURATIONS>
         <CONFIGURATION isDebug="1" name="Debug" targetName="jafnhar"/>
         <CONFIGURATION isDebug="0" name="Release" targetName="jafnhar"/>

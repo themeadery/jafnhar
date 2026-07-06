@@ -1,10 +1,14 @@
 #include "MainComponent.h"
 #include "iso226_data.h"
 #include "Telemetry.h"
+#include "Logger.h"
+#include "LogWindow.h"
 
 //==============================================================================
 MainComponent::MainComponent()
 {
+    logger::init();
+
     // Load persistent settings first so scale is known before sizing
     juce::PropertiesFile::Options pOpts;
     pOpts.applicationName = "jafnhar";
@@ -23,6 +27,11 @@ MainComponent::MainComponent()
     }
 
     setSize (juce::roundToInt(1280.0f * uiScale), juce::roundToInt(536.0f * uiScale));
+
+    spdlog::info("jafnhar v{} starting — OS: {}",
+                 ProjectInfo::versionString,
+                 juce::SystemStats::getOperatingSystemName().toStdString()
+    );
 
     bypassToggle.setButtonText("Bypass");
     bypassToggle.setToggleState(false, juce::dontSendNotification); // Default to disabled
@@ -88,6 +97,12 @@ MainComponent::MainComponent()
         auto devices = juce::MidiInput::getAvailableDevices();
         auto idx = midiDeviceCombo.getSelectedItemIndex();
         if (idx >= 0 && idx < devices.size()) {
+            auto name = devices[idx].name;
+            if (name != lastMidiDeviceName)
+            {
+                spdlog::info("MIDI device found: {}", name.toStdString());
+                lastMidiDeviceName = name;
+            }
             midiInput.reset();
             midiInput = juce::MidiInput::openDevice(devices[idx].identifier, this);
             if (midiInput)
@@ -171,6 +186,14 @@ MainComponent::MainComponent()
             });
     };
     addAndMakeVisible(settingsButton);
+
+    logButton.onClick = [this] {
+        if (!logWindow)
+            logWindow = std::make_unique<LogWindow>();
+        logWindow->centreAroundComponent(this, logWindow->getWidth(), logWindow->getHeight());
+        logWindow->setVisible(true);
+    };
+    addAndMakeVisible(logButton);
 
     Telemetry::sendPing(installId);
 
@@ -268,11 +291,28 @@ void MainComponent::paint (juce::Graphics& g)
     g.fillAll (getLookAndFeel().findColour (juce::ResizableWindow::backgroundColourId));
 
     auto* device = deviceManager.getCurrentAudioDevice();
+    if (device)
+    {
+        auto name = device->getName();
+        if (name != lastDeviceName)
+        {
+            spdlog::info("Audio device found: {}", name.toStdString());
+            lastDeviceName = name;
+        }
+        noDeviceLogged = false;
+    }
+    else if (!noDeviceLogged)
+    {
+        spdlog::warn("No audio device available");
+        noDeviceLogged = true;
+        lastDeviceName = {};
+    }
+
     juce::String info = device ? device->getName() : "No device";
     g.setColour (juce::Colours::white);
     g.drawText (info, 10, 10, 300, 20, juce::Justification::left);
 
-    int meterHeight = (int)h - 60;
+    int meterHeight = (int)h - 80;
     int barWidth = 4;
     int spacing = 10;
     int meterTop = 40;
@@ -541,6 +581,12 @@ void MainComponent::resized()
     int gearSize = S(24);
     int gearX = getWidth() - 2 * btnSize - gearSize - S(8) - 2 * btnGap;
     settingsButton.setBounds(gearX, btnTop - S(2), gearSize, gearSize);
+
+    int logBtnW = S(36);
+    int logBtnH = S(18);
+    logButton.setBounds(getWidth() - logBtnW - S(8),
+                        getHeight() - logBtnH - S(4),
+                        logBtnW, logBtnH);
 
     auto fontOpts = juce::FontOptions(13.0f * uiScale);
     sourcePhonLabel.setFont(fontOpts);

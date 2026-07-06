@@ -8,9 +8,11 @@
     This component lives inside our window, and this is where you should put all
     your controls and content.
 */
+class LogWindow;
+
 class MainComponent  : public juce::AudioAppComponent,
-                      public juce::Timer,
-                      public juce::MidiInputCallback
+                       public juce::Timer,
+                       public juce::MidiInputCallback
 {
 public:
     //==============================================================================
@@ -140,7 +142,12 @@ private:
     juce::TextButton minimiseButton;
     juce::TextButton closeButton;
     GearButton settingsButton;
+    juce::TextButton logButton{ "Log" };
+    std::unique_ptr<LogWindow> logWindow;
     float uiScale = 1.0f;
+    bool noDeviceLogged = false;
+    juce::String lastDeviceName;
+    juce::String lastMidiDeviceName;
     juce::ComponentDragger windowDragger;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MainComponent)
