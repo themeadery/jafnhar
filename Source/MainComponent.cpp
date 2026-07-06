@@ -1,5 +1,6 @@
 #include "MainComponent.h"
 #include "iso226_data.h"
+#include "Telemetry.h"
 
 //==============================================================================
 MainComponent::MainComponent()
@@ -13,6 +14,13 @@ MainComponent::MainComponent()
     appProperties.setStorageParameters(pOpts);
     auto* props = appProperties.getUserSettings();
     uiScale = (float)props->getDoubleValue("uiScale", 1.0);
+
+    auto installId = props->getValue("installId");
+    if (installId.isEmpty())
+    {
+        installId = juce::Uuid().toString();
+        props->setValue("installId", installId);
+    }
 
     setSize (juce::roundToInt(1280.0f * uiScale), juce::roundToInt(536.0f * uiScale));
 
@@ -163,6 +171,8 @@ MainComponent::MainComponent()
             });
     };
     addAndMakeVisible(settingsButton);
+
+    Telemetry::sendPing(installId);
 
     startTimer (60); // repaint screen every 60ms
 }
