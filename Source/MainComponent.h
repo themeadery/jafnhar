@@ -31,9 +31,81 @@ public:
     void mouseDrag(const juce::MouseEvent& event) override;
 
 private:
+    class GearButton : public juce::Component
+    {
+    public:
+        GearButton()
+        {
+            setMouseCursor(juce::MouseCursor::PointingHandCursor);
+        }
+        void paint(juce::Graphics& g) override
+        {
+            auto b = getLocalBounds().reduced(juce::roundToInt(getWidth() * 0.12f)).toFloat();
+            auto cx = b.getCentreX(), cy = b.getCentreY();
+            float size = juce::jmin(b.getWidth(), b.getHeight());
+            float s = size / 1024.0f;
+
+            juce::Path gear;
+            gear.setUsingNonZeroWinding(false);
+
+            gear.addEllipse(511.92f - 162.0f, 512.032f - 162.0f, 324.0f, 324.0f);
+
+            gear.startNewSubPath(836.624f, 605.056f);
+            gear.lineTo(807.44f, 675.36f);
+            gear.lineTo(866.384f, 791.104f);
+            gear.lineTo(794.192f, 863.296f);
+            gear.lineTo(675.76f, 807.36f);
+            gear.lineTo(605.456f, 836.224f);
+            gear.lineTo(569.776f, 945.472f);
+            gear.lineTo(565.2f, 959.968f);
+            gear.lineTo(463.184f, 959.968f);
+            gear.lineTo(419.024f, 836.64f);
+            gear.lineTo(348.72f, 807.648f);
+            gear.lineTo(232.816f, 866.336f);
+            gear.lineTo(160.656f, 794.208f);
+            gear.lineTo(216.528f, 675.712f);
+            gear.lineTo(187.568f, 605.472f);
+            gear.lineTo(64.048f, 565.152f);
+            gear.lineTo(64.048f, 463.168f);
+            gear.lineTo(187.44f, 418.944f);
+            gear.lineTo(216.4f, 348.768f);
+            gear.lineTo(164.496f, 246.304f);
+            gear.lineTo(157.648f, 232.864f);
+            gear.lineTo(229.712f, 160.8f);
+            gear.lineTo(348.304f, 216.64f);
+            gear.lineTo(418.512f, 187.616f);
+            gear.lineTo(454.16f, 78.432f);
+            gear.lineTo(458.768f, 63.968f);
+            gear.lineTo(560.784f, 63.968f);
+            gear.lineTo(604.976f, 187.424f);
+            gear.lineTo(675.088f, 216.448f);
+            gear.lineTo(791.152f, 157.632f);
+            gear.lineTo(863.28f, 229.696f);
+            gear.lineTo(807.408f, 348.096f);
+            gear.lineTo(836.272f, 418.432f);
+            gear.lineTo(960.016f, 458.688f);
+            gear.lineTo(960.016f, 560.64f);
+            gear.lineTo(836.656f, 605.024f);
+            gear.closeSubPath();
+
+            gear.applyTransform(juce::AffineTransform::scale(s, s)
+                .translated(cx - 512.0f * s, cy - 512.0f * s));
+
+            g.setColour(juce::Colours::lightgrey);
+            g.fillPath(gear);
+        }
+        void mouseDown(const juce::MouseEvent&) override
+        {
+            if (onClick)
+                onClick();
+        }
+        std::function<void()> onClick;
+    };
+
     void initializeISO226Filter(double sampleRate);
     void updateFreqResponse(double sampleRate);
     void rebuildFilter();
+    void setUIScale(float scale);
     std::vector<float> buildIR(double sampleRate);
 
     float inputLevels[6] = {};
@@ -67,6 +139,8 @@ private:
 
     juce::TextButton minimiseButton;
     juce::TextButton closeButton;
+    GearButton settingsButton;
+    float uiScale = 1.0f;
     juce::ComponentDragger windowDragger;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MainComponent)

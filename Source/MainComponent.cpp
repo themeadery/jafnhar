@@ -4,9 +4,17 @@
 //==============================================================================
 MainComponent::MainComponent()
 {
-    // Make sure you set the size of the component after
-    // you add any child components.
-    setSize (1280, 536);
+    // Load persistent settings first so scale is known before sizing
+    juce::PropertiesFile::Options pOpts;
+    pOpts.applicationName = "jafnhar";
+    pOpts.filenameSuffix = ".settings";
+    pOpts.osxLibrarySubFolder = "Application Support";
+    pOpts.folderName = "jafnhar";
+    appProperties.setStorageParameters(pOpts);
+    auto* props = appProperties.getUserSettings();
+    uiScale = (float)props->getDoubleValue("uiScale", 1.0);
+
+    setSize (juce::roundToInt(1280.0f * uiScale), juce::roundToInt(536.0f * uiScale));
 
     bypassToggle.setButtonText("Bypass");
     bypassToggle.setToggleState(false, juce::dontSendNotification); // Default to disabled
@@ -59,14 +67,6 @@ MainComponent::MainComponent()
     setupPhonLabel(phonUnitLabel, "phon");
     addAndMakeVisible(phonUnitLabel);
 
-    // Persistent settings
-    juce::PropertiesFile::Options pOpts;
-    pOpts.applicationName = "jafnhar";
-    pOpts.filenameSuffix = ".settings";
-    pOpts.osxLibrarySubFolder = "Application Support";
-    pOpts.folderName = "jafnhar";
-    appProperties.setStorageParameters(pOpts);
-    auto* props = appProperties.getUserSettings();
     auto savedDeviceId = props->getValue("midiDeviceId", "");
     midiSourceCC = props->getIntValue("midiSourceCC", -1);
     midiTargetCC = props->getIntValue("midiTargetCC", -1);
@@ -134,7 +134,7 @@ MainComponent::MainComponent()
         setAudioChannels (6, 6);
     }
 
-    minimiseButton.setButtonText("\xe2\x80\x93");
+    minimiseButton.setButtonText("_");
     minimiseButton.onClick = [this] {
         if (auto* rw = findParentComponentOfClass<juce::ResizableWindow>())
             rw->setMinimised(true);
@@ -146,6 +146,23 @@ MainComponent::MainComponent()
         juce::JUCEApplication::getInstance()->systemRequestedQuit();
     };
     addAndMakeVisible(closeButton);
+
+    settingsButton.onClick = [this] {
+        juce::PopupMenu menu;
+        std::vector<float> scales = { 0.50f, 0.75f, 0.90f, 1.00f, 1.25f, 1.50f, 1.75f, 2.00f };
+        for (auto s : scales) {
+            auto label = juce::String((int)(s * 100.0f)) + "%";
+            menu.addItem((int)(s * 100.0f), label, true, std::abs(uiScale - s) < 0.001f);
+        }
+        menu.showMenuAsync(juce::PopupMenu::Options().withMinimumWidth(100),
+            [this](int result) {
+                if (result > 0) {
+                    auto newScale = (float)result / 100.0f;
+                    setUIScale(newScale);
+                }
+            });
+    };
+    addAndMakeVisible(settingsButton);
 
     startTimer (60); // repaint screen every 60ms
 }
@@ -233,6 +250,11 @@ void MainComponent::releaseResources()
 //==============================================================================
 void MainComponent::paint (juce::Graphics& g)
 {
+    g.addTransform(juce::AffineTransform::scale(uiScale));
+
+    float w = getWidth() / uiScale;
+    float h = getHeight() / uiScale;
+
     g.fillAll (getLookAndFeel().findColour (juce::ResizableWindow::backgroundColourId));
 
     auto* device = deviceManager.getCurrentAudioDevice();
@@ -240,14 +262,14 @@ void MainComponent::paint (juce::Graphics& g)
     g.setColour (juce::Colours::white);
     g.drawText (info, 10, 10, 300, 20, juce::Justification::left);
 
-    int meterHeight = getHeight() - 60;
+    int meterHeight = (int)h - 60;
     int barWidth = 4;
     int spacing = 10;
     int meterTop = 40;
     int labelAreaWidth = 50;
     int inputMeterStartX = labelAreaWidth + 10;
 
-    int windowWidth = getWidth();
+    int windowWidth = (int)w;
     int outputLabelAreaWidth = 50;
     int outputMeterStartX = windowWidth - outputLabelAreaWidth - (6 * spacing) - 10;
 
@@ -461,17 +483,19 @@ void MainComponent::paint (juce::Graphics& g)
 
 void MainComponent::resized()
 {
-    int meterHeight = getHeight() - 60;
-    int spacing = 10;
-    int inputMeterStartX = 60;
+    auto S = [this](int v) { return juce::roundToInt(v * uiScale); };
 
-    int plotX = inputMeterStartX + 6 * spacing + 15;
-    int plotY = 40;
-    int plotH = meterHeight - 115;
+    int meterHeight = getHeight() - S(60);
+    int spacing = S(10);
+    int inputMeterStartX = S(60);
 
-    int knobY = plotY + plotH + 34;
-    int knobSize = 80;
-    int knobGap = 34;
+    int plotX = inputMeterStartX + 6 * spacing + S(15);
+    int plotY = S(40);
+    int plotH = meterHeight - S(115);
+
+    int knobY = plotY + plotH + S(34);
+    int knobSize = S(80);
+    int knobGap = S(34);
 
     int srcKnobX = plotX;
     int tgtKnobX = plotX + knobSize + knobGap;
@@ -479,34 +503,47 @@ void MainComponent::resized()
     sourcePhonSlider.setBounds(srcKnobX, knobY, knobSize, knobSize);
     targetPhonSlider.setBounds(tgtKnobX, knobY, knobSize, knobSize);
 
-    int titleY = knobY - 18;
-    int titleH = 16;
+    int titleY = knobY - S(18);
+    int titleH = S(16);
     sourceTitle.setBounds(srcKnobX, titleY, knobSize, titleH);
     targetTitle.setBounds(tgtKnobX, titleY, knobSize, titleH);
 
-    int labelY = knobY + knobSize + 2;
-    int labelH = 16;
+    int labelY = knobY + knobSize + S(2);
+    int labelH = S(16);
     sourcePhonLabel.setBounds(srcKnobX, labelY, knobSize, labelH);
     targetPhonLabel.setBounds(tgtKnobX, labelY, knobSize, labelH);
     phonUnitLabel.setBounds(srcKnobX + knobSize, labelY, knobGap, labelH);
 
-    sourceLearnBtn.setBounds(srcKnobX + knobSize + 4, knobY + 30, 28, 20);
-    targetLearnBtn.setBounds(tgtKnobX + knobSize + 4, knobY + 30, 28, 20);
+    sourceLearnBtn.setBounds(srcKnobX + knobSize + S(4), knobY + S(30), S(28), S(20));
+    targetLearnBtn.setBounds(tgtKnobX + knobSize + S(4), knobY + S(30), S(28), S(20));
 
-    int rightX = tgtKnobX + knobSize + 40;
-    midiDeviceLabel.setBounds(rightX, titleY, 180, 14);
-    midiDeviceCombo.setBounds(rightX, titleY + 14, 180, 18);
-    bypassToggle.setBounds(rightX, knobY + 65, 110, 22);
+    int rightX = tgtKnobX + knobSize + S(40);
+    midiDeviceLabel.setBounds(rightX, titleY, S(180), S(14));
+    midiDeviceCombo.setBounds(rightX, titleY + S(14), S(180), S(18));
+    bypassToggle.setBounds(rightX, knobY + S(65), S(110), S(22));
 
-    int btnSize = 20;
-    int btnTop = 8;
-    closeButton.setBounds(getWidth() - btnSize - 8, btnTop, btnSize, btnSize);
-    minimiseButton.setBounds(getWidth() - 2 * btnSize - 12, btnTop, btnSize, btnSize);
+    int btnSize = S(20);
+    int btnTop = S(8);
+    int btnGap = S(4);
+    closeButton.setBounds(getWidth() - btnSize - S(8), btnTop, btnSize, btnSize);
+    minimiseButton.setBounds(getWidth() - 2 * btnSize - S(8) - btnGap, btnTop, btnSize, btnSize);
+
+    int gearSize = S(24);
+    int gearX = getWidth() - 2 * btnSize - gearSize - S(8) - 2 * btnGap;
+    settingsButton.setBounds(gearX, btnTop - S(2), gearSize, gearSize);
+
+    auto fontOpts = juce::FontOptions(13.0f * uiScale);
+    sourcePhonLabel.setFont(fontOpts);
+    targetPhonLabel.setFont(fontOpts);
+    sourceTitle.setFont(fontOpts);
+    targetTitle.setFont(fontOpts);
+    phonUnitLabel.setFont(fontOpts);
+    midiDeviceLabel.setFont(fontOpts);
 }
 
 void MainComponent::mouseDown(const juce::MouseEvent& event)
 {
-    if (event.y < 40)
+    if (event.y < juce::roundToInt(40.0f * uiScale))
         windowDragger.startDraggingComponent(getTopLevelComponent(), event);
 }
 
@@ -585,6 +622,17 @@ void MainComponent::initializeISO226Filter(double sampleRate)
 
     loadIR(convolutionL, irBuffer);
     loadIR(convolutionR, std::move(irBuffer));
+}
+
+void MainComponent::setUIScale(float scale)
+{
+    uiScale = scale;
+    if (auto* dw = findParentComponentOfClass<juce::DocumentWindow>())
+        dw->setSize(juce::roundToInt(1280.0f * scale), juce::roundToInt(536.0f * scale));
+    appProperties.getUserSettings()->setValue("uiScale", (double)scale);
+    appProperties.saveIfNeeded();
+    resized();
+    repaint();
 }
 
 std::vector<float> MainComponent::buildIR(double sampleRate)
