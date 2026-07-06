@@ -84,6 +84,16 @@ MainComponent::MainComponent()
     setupPhonLabel(phonUnitLabel, "phon");
     addAndMakeVisible(phonUnitLabel);
 
+    vikingFont = juce::Font(juce::FontOptions(
+        juce::Typeface::createSystemTypefaceFor(
+            BinaryData::Viking_ttf, BinaryData::Viking_ttfSize)));
+
+    appTitle.setText("jafnhar", juce::dontSendNotification);
+    appTitle.setJustificationType(juce::Justification::centred);
+    appTitle.setFont(vikingFont.withHeight(16.0f));
+    appTitle.setColour(juce::Label::textColourId, juce::Colours::lightgrey);
+    addAndMakeVisible(appTitle);
+
     auto savedDeviceId = props->getValue("midiDeviceId", "");
     midiSourceCC = props->getIntValue("midiSourceCC", -1);
     midiTargetCC = props->getIntValue("midiTargetCC", -1);
@@ -587,6 +597,9 @@ void MainComponent::resized()
     logButton.setBounds(getWidth() - logBtnW - S(8),
                         getHeight() - logBtnH - S(4),
                         logBtnW, logBtnH);
+
+    appTitle.setBounds(0, S(8), getWidth(), S(20));
+    appTitle.setFont(vikingFont.withHeight(16.0f * uiScale));
 
     auto fontOpts = juce::FontOptions(13.0f * uiScale);
     sourcePhonLabel.setFont(fontOpts);

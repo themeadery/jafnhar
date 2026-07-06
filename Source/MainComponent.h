@@ -124,6 +124,8 @@ private:
     juce::Slider targetPhonSlider;
     juce::Label sourceTitle;
     juce::Label targetTitle;
+    juce::Label appTitle;
+    juce::Font vikingFont;
     juce::Label sourcePhonLabel;
     juce::Label targetPhonLabel;
     juce::Label phonUnitLabel;

@@ -5,14 +5,14 @@
               companyName="The Meadery" companyWebsite="www.themeadery.buzz">
   <MAINGROUP id="c5989V" name="jafnhar">
     <GROUP id="{E1B96927-BD32-DBA1-311A-6DD0A425B4D1}" name="Source">
+      <FILE id="Avke9Q" name="Viking.ttf" compile="0" resource="1" file="Source/fonts/Viking.ttf"/>
       <FILE id="jfFGzp" name="iso226_data.h" compile="0" resource="0" file="Source/iso226_data.h"/>
       <FILE id="hNZIuO" name="Main.cpp" compile="1" resource="0" file="Source/Main.cpp"/>
       <FILE id="GIJkHm" name="MainComponent.h" compile="0" resource="0" file="Source/MainComponent.h"/>
       <FILE id="VHpUuH" name="MainComponent.cpp" compile="1" resource="0"
             file="Source/MainComponent.cpp"/>
       <FILE id="eqFvKp" name="LogWindow.h" compile="0" resource="0" file="Source/LogWindow.h"/>
-      <FILE id="lPqRnW" name="LogWindow.cpp" compile="1" resource="0"
-            file="Source/LogWindow.cpp"/>
+      <FILE id="lPqRnW" name="LogWindow.cpp" compile="1" resource="0" file="Source/LogWindow.cpp"/>
     </GROUP>
   </MAINGROUP>
   <MODULES>
