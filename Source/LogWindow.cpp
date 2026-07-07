@@ -6,7 +6,7 @@ LogWindow::LogWindow()
 {
     editor.setMultiLine(true);
     editor.setReadOnly(true);
-    editor.setFont(juce::Font(11.0f));
+    editor.setFont(juce::Font(juce::FontOptions(11.0f)));
     setContentOwned(&editor, false);
     setResizable(true, false);
     setSize(700, 400);

@@ -105,6 +105,33 @@ private:
         std::function<void()> onClick;
     };
 
+    class MeaderyLogo : public juce::Component
+    {
+    public:
+        void paint(juce::Graphics& g) override
+        {
+            auto b = getLocalBounds().reduced(juce::roundToInt(getWidth() * 0.05f)).toFloat();
+            auto cx = b.getCentreX(), cy = b.getCentreY();
+            float size = juce::jmin(b.getWidth(), b.getHeight());
+            float s = size / 200.0f;
+
+            juce::Path hex;
+            hex.startNewSubPath(100.0f, 20.0f);
+            hex.lineTo(169.28f, 60.0f);
+            hex.lineTo(169.28f, 140.0f);
+            hex.lineTo(100.0f, 180.0f);
+            hex.lineTo(30.72f, 140.0f);
+            hex.lineTo(30.72f, 60.0f);
+            hex.closeSubPath();
+
+            hex.applyTransform(juce::AffineTransform::scale(s, s)
+                .translated(cx - 100.0f * s, cy - 100.0f * s));
+
+            g.setColour(juce::Colours::grey.darker(0.4f));
+            g.strokePath(hex, juce::PathStrokeType(8.0f));
+        }
+    };
+
     void initializeISO226Filter(double sampleRate);
     void updateFreqResponse(double sampleRate);
     void rebuildFilter();
@@ -132,6 +159,8 @@ private:
     juce::Label volumeLabel;
     juce::Label volumeTitle;
     juce::TextButton volumeLearnBtn{ "L" };
+    MeaderyLogo meaderyLogo;
+    juce::Label meaderyLabel;
     double actualPhon = 60.0;
     double targetPhon = 80.0;
     double masterVolume = 1.0;

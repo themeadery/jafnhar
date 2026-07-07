@@ -102,6 +102,12 @@ MainComponent::MainComponent()
     setupPhonLabel(volumeTitle, "Master Volume");
     addAndMakeVisible(volumeTitle);
 
+    addAndMakeVisible(meaderyLogo);
+    meaderyLabel.setText("The Meadery", juce::dontSendNotification);
+    meaderyLabel.setJustificationType(juce::Justification::centred);
+    meaderyLabel.setColour(juce::Label::textColourId, juce::Colours::grey.darker(0.4f));
+    addAndMakeVisible(meaderyLabel);
+
     vikingFont = juce::Font(juce::FontOptions(
         juce::Typeface::createSystemTypefaceFor(
             BinaryData::Viking_ttf, BinaryData::Viking_ttfSize)));
@@ -199,7 +205,7 @@ MainComponent::MainComponent()
         setAudioChannels (6, 6);
     }
 
-    minimiseButton.setButtonText("_");
+    minimiseButton.setButtonText("-");
     minimiseButton.onClick = [this] {
         if (auto* rw = findParentComponentOfClass<juce::ResizableWindow>())
             rw->setMinimised(true);
@@ -625,6 +631,12 @@ void MainComponent::resized()
     midiDeviceCombo.setBounds(rightX, titleY + S(14), S(180), S(18));
     bypassToggle.setBounds(rightX, knobY + S(65), S(110), S(22));
 
+    int logoSize = S(110);
+    int logoX = (rightX + S(180) + volKnobX - logoSize) / 2;
+    int logoY = knobY - S(46);
+    meaderyLogo.setBounds(logoX, logoY, logoSize, logoSize);
+    meaderyLabel.setBounds(logoX - S(40), logoY + logoSize - S(3), logoSize + S(80), S(22));
+
     int btnSize = S(20);
     int btnTop = S(8);
     int btnGap = S(4);
@@ -653,6 +665,7 @@ void MainComponent::resized()
     midiDeviceLabel.setFont(fontOpts);
     volumeLabel.setFont(fontOpts);
     volumeTitle.setFont(fontOpts);
+    meaderyLabel.setFont(juce::FontOptions(17.0f * uiScale).withStyle("Bold"));
 }
 
 void MainComponent::mouseDown(const juce::MouseEvent& event)
