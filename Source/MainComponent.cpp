@@ -86,6 +86,22 @@ MainComponent::MainComponent()
     setupPhonLabel(phonUnitLabel, "phon");
     addAndMakeVisible(phonUnitLabel);
 
+    volumeSlider.setSliderStyle(juce::Slider::RotaryVerticalDrag);
+    volumeSlider.setRange(0.0, 1.0, 0.01);
+    volumeSlider.setValue(1.0, juce::dontSendNotification);
+    volumeSlider.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
+    volumeSlider.onValueChange = [this] {
+        masterVolume = volumeSlider.getValue();
+        volumeLabel.setText(juce::String(juce::roundToInt(masterVolume * 100.0)), juce::dontSendNotification);
+        appProperties.getUserSettings()->setValue("masterVolume", masterVolume);
+        appProperties.saveIfNeeded();
+    };
+    addAndMakeVisible(volumeSlider);
+    setupPhonLabel(volumeLabel, "100");
+    addAndMakeVisible(volumeLabel);
+    setupPhonLabel(volumeTitle, "Master Volume");
+    addAndMakeVisible(volumeTitle);
+
     vikingFont = juce::Font(juce::FontOptions(
         juce::Typeface::createSystemTypefaceFor(
             BinaryData::Viking_ttf, BinaryData::Viking_ttfSize)));
@@ -99,6 +115,10 @@ MainComponent::MainComponent()
     auto savedDeviceId = props->getValue("midiDeviceId", "");
     midiSourceCC = props->getIntValue("midiSourceCC", -1);
     midiTargetCC = props->getIntValue("midiTargetCC", -1);
+    midiVolumeCC = props->getIntValue("midiVolumeCC", -1);
+    masterVolume = props->getDoubleValue("masterVolume", 1.0);
+    volumeSlider.setValue(masterVolume, juce::dontSendNotification);
+    volumeLabel.setText(juce::String(juce::roundToInt(masterVolume * 100.0)), juce::dontSendNotification);
 
     // MIDI device combo
     midiDeviceCombo.setTextWhenNoChoicesAvailable("No MIDI inputs");
@@ -155,6 +175,16 @@ MainComponent::MainComponent()
         sourceLearnBtn.setButtonText("L");
     };
     addAndMakeVisible(targetLearnBtn);
+
+    volumeLearnBtn.onClick = [this] {
+        learningForVolume = true;
+        learningForSource = false;
+        learningForTarget = false;
+        volumeLearnBtn.setButtonText("Learn...");
+        sourceLearnBtn.setButtonText("L");
+        targetLearnBtn.setButtonText("L");
+    };
+    addAndMakeVisible(volumeLearnBtn);
 
     // Some platforms require permissions to open input channels so request that here
     if (juce::RuntimePermissions::isRequired (juce::RuntimePermissions::recordAudio)
@@ -279,6 +309,11 @@ void MainComponent::getNextAudioBlock(const juce::AudioSourceChannelInfo& buffer
         else
         {
             juce::FloatVectorOperations::clear(out, bufferToFill.numSamples);
+        }
+        if (masterVolume < 1.0f && (ch == 0 || ch == 1))
+        {
+            juce::FloatVectorOperations::multiply(out, (float)masterVolume, bufferToFill.numSamples);
+            peak *= (float)masterVolume;
         }
         outputLevels[ch] = std::max(outputLevels[ch] * 0.95f, peak);
     }
@@ -576,6 +611,12 @@ void MainComponent::resized()
     targetPhonLabel.setBounds(tgtKnobX, labelY, knobSize, labelH);
     phonUnitLabel.setBounds(actualKnobX + knobSize, labelY, knobGap, labelH);
 
+    int volKnobX = getWidth() - knobSize - S(135);
+    volumeSlider.setBounds(volKnobX, knobY, knobSize, knobSize);
+    volumeTitle.setBounds(volKnobX, titleY, knobSize, titleH);
+    volumeLabel.setBounds(volKnobX, labelY, knobSize, labelH);
+    volumeLearnBtn.setBounds(volKnobX - S(28) - S(4), knobY + S(30), S(28), S(20));
+
     sourceLearnBtn.setBounds(actualKnobX + knobSize + S(4), knobY + S(30), S(28), S(20));
     targetLearnBtn.setBounds(tgtKnobX + knobSize + S(4), knobY + S(30), S(28), S(20));
 
@@ -610,6 +651,8 @@ void MainComponent::resized()
     targetTitle.setFont(fontOpts);
     phonUnitLabel.setFont(fontOpts);
     midiDeviceLabel.setFont(fontOpts);
+    volumeLabel.setFont(fontOpts);
+    volumeTitle.setFont(fontOpts);
 }
 
 void MainComponent::mouseDown(const juce::MouseEvent& event)
@@ -666,6 +709,16 @@ void MainComponent::handleIncomingMidiMessage(juce::MidiInput*, const juce::Midi
         });
         return;
     }
+    if (learningForVolume) {
+        juce::MessageManager::callAsync([this, cc] {
+            midiVolumeCC = cc;
+            learningForVolume = false;
+            volumeLearnBtn.setButtonText("L");
+            appProperties.getUserSettings()->setValue("midiVolumeCC", midiVolumeCC);
+            appProperties.saveIfNeeded();
+        });
+        return;
+    }
 
     if (cc == midiSourceCC) {
         int idx = juce::jlimit(20, 100, juce::roundToInt(20.0f + val / 127.0f * 80.0f));
@@ -679,6 +732,12 @@ void MainComponent::handleIncomingMidiMessage(juce::MidiInput*, const juce::Midi
         juce::MessageManager::callAsync([this, idx] {
             targetPhonSlider.setValue((double)idx);
             rebuildFilter();
+        });
+    }
+    if (cc == midiVolumeCC) {
+        double vol = juce::jmap((double)val, 0.0, 127.0, 0.0, 1.0);
+        juce::MessageManager::callAsync([this, vol] {
+            volumeSlider.setValue(vol);
         });
     }
 }

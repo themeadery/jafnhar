@@ -119,8 +119,6 @@ private:
     juce::ComboBox midiDeviceCombo;
     juce::Label midiDeviceLabel;
     juce::TextButton sourceLearnBtn{ "L" }, targetLearnBtn{ "L" };
-    int midiSourceCC = -1, midiTargetCC = -1;
-    bool learningForSource = false, learningForTarget = false;
     juce::Slider actualPhonSlider;
     juce::Slider targetPhonSlider;
     juce::Label actualTitle;
@@ -130,8 +128,15 @@ private:
     juce::Label actualPhonLabel;
     juce::Label targetPhonLabel;
     juce::Label phonUnitLabel;
+    juce::Slider volumeSlider;
+    juce::Label volumeLabel;
+    juce::Label volumeTitle;
+    juce::TextButton volumeLearnBtn{ "L" };
     double actualPhon = 60.0;
     double targetPhon = 80.0;
+    double masterVolume = 1.0;
+    int midiSourceCC = -1, midiTargetCC = -1, midiVolumeCC = -1;
+    bool learningForSource = false, learningForTarget = false, learningForVolume = false;
     double currentSampleRate = 0.0;
     juce::dsp::ProcessSpec spec;
     juce::dsp::Convolution convolutionL, convolutionR;
