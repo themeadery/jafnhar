@@ -1,5 +1,7 @@
 # Jafnhár
 
+![screenshot](assets/screenshot_2026-07-07.png)
+
 ## Etymology and Meaning
 
 The word is a compound formed by two distinct elements:
