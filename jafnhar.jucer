@@ -5,6 +5,8 @@
               companyName="The Meadery" companyWebsite="www.themeadery.buzz">
   <MAINGROUP id="c5989V" name="jafnhar">
     <GROUP id="{E1B96927-BD32-DBA1-311A-6DD0A425B4D1}" name="Source">
+      <FILE id="ViBTRK" name="icon_large.png" compile="0" resource="1" file="Source/icons/icon_large.png"/>
+      <FILE id="CYLUbv" name="icon_small.png" compile="0" resource="1" file="Source/icons/icon_small.png"/>
       <FILE id="Avke9Q" name="Viking.ttf" compile="0" resource="1" file="Source/fonts/Viking.ttf"/>
       <FILE id="jfFGzp" name="iso226_data.h" compile="0" resource="0" file="Source/iso226_data.h"/>
       <FILE id="hNZIuO" name="Main.cpp" compile="1" resource="0" file="Source/Main.cpp"/>
@@ -34,7 +36,8 @@
   <JUCEOPTIONS JUCE_STRICT_REFCOUNTEDPOINTER="1" JUCE_USE_ANDROID_OBOE="0" JUCE_ALSA="0"
                JUCE_DIRECTSOUND="0" JUCE_WASAPI="0" JUCE_ASIO="1"/>
   <EXPORTFORMATS>
-    <VS2026 targetFolder="Builds/VisualStudio2026" extraSearchPaths="../../Source/third_party/spdlog/include">
+    <VS2026 targetFolder="Builds/VisualStudio2026" extraSearchPaths="../../Source/third_party/spdlog/include"
+            smallIcon="CYLUbv" bigIcon="ViBTRK">
       <CONFIGURATIONS>
         <CONFIGURATION isDebug="1" name="Debug" targetName="jafnhar"/>
         <CONFIGURATION isDebug="0" name="Release" targetName="jafnhar"/>

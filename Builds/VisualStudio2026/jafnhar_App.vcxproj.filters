@@ -7895,6 +7895,12 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
+    <None Include="..\..\Source\icons\icon_large.png">
+      <Filter>jafnhar\Source</Filter>
+    </None>
+    <None Include="..\..\Source\icons\icon_small.png">
+      <Filter>jafnhar\Source</Filter>
+    </None>
     <None Include="..\..\Source\fonts\Viking.ttf">
       <Filter>jafnhar\Source</Filter>
     </None>
@@ -7969,6 +7975,9 @@
     </None>
     <None Include="..\..\..\JUCE\modules\juce_graphics\unicode\sheenbidi\JUCE_CHANGES.txt">
       <Filter>JUCE Modules\juce_graphics\unicode\sheenbidi</Filter>
+    </None>
+    <None Include=".\icon.ico">
+      <Filter>JUCE Library Code</Filter>
     </None>
   </ItemGroup>
   <ItemGroup>
