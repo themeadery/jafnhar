@@ -365,3 +365,4 @@ FodyWeavers.xsd
 /Builds/VisualStudio2026/freq_response.csv
 /AGENTS.md
 /deploy
+/plot_freq.py
