@@ -45,23 +45,23 @@ MainComponent::MainComponent()
         label.setColour(juce::Label::textColourId, juce::Colours::lightgrey);
     };
 
-    sourcePhonSlider.setSliderStyle(juce::Slider::RotaryVerticalDrag);
-    sourcePhonSlider.setRange(20.0, 100.0, 1.0);
-    sourcePhonSlider.setValue(60.0, juce::dontSendNotification);
-    sourcePhonSlider.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
-    sourcePhonSlider.onValueChange = [this] {
-        sourcePhon = sourcePhonSlider.getValue();
-        sourcePhonLabel.setText(juce::String((int)sourcePhon), juce::dontSendNotification);
+    actualPhonSlider.setSliderStyle(juce::Slider::RotaryVerticalDrag);
+    actualPhonSlider.setRange(20.0, 100.0, 1.0);
+    actualPhonSlider.setValue(60.0, juce::dontSendNotification);
+    actualPhonSlider.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
+    actualPhonSlider.onValueChange = [this] {
+        actualPhon = actualPhonSlider.getValue();
+        actualPhonLabel.setText(juce::String((int)actualPhon), juce::dontSendNotification);
         updateFreqResponse(currentSampleRate);
         repaint();
     };
-    sourcePhonSlider.onDragEnd = [this] { rebuildFilter(); };
-    addAndMakeVisible(sourcePhonSlider);
-    setupPhonLabel(sourcePhonLabel, "60");
-    addAndMakeVisible(sourcePhonLabel);
+    actualPhonSlider.onDragEnd = [this] { rebuildFilter(); };
+    addAndMakeVisible(actualPhonSlider);
+    setupPhonLabel(actualPhonLabel, "60");
+    addAndMakeVisible(actualPhonLabel);
 
-    setupPhonLabel(sourceTitle, "Source");
-    addAndMakeVisible(sourceTitle);
+    setupPhonLabel(actualTitle, "Actual");
+    addAndMakeVisible(actualTitle);
 
     targetPhonSlider.setSliderStyle(juce::Slider::RotaryVerticalDrag);
     targetPhonSlider.setRange(20.0, 100.0, 1.0);
@@ -557,24 +557,24 @@ void MainComponent::resized()
     int knobSize = S(80);
     int knobGap = S(34);
 
-    int srcKnobX = plotX;
+    int actualKnobX = plotX;
     int tgtKnobX = plotX + knobSize + knobGap;
 
-    sourcePhonSlider.setBounds(srcKnobX, knobY, knobSize, knobSize);
+    actualPhonSlider.setBounds(actualKnobX, knobY, knobSize, knobSize);
     targetPhonSlider.setBounds(tgtKnobX, knobY, knobSize, knobSize);
 
     int titleY = knobY - S(18);
     int titleH = S(16);
-    sourceTitle.setBounds(srcKnobX, titleY, knobSize, titleH);
+    actualTitle.setBounds(actualKnobX, titleY, knobSize, titleH);
     targetTitle.setBounds(tgtKnobX, titleY, knobSize, titleH);
 
     int labelY = knobY + knobSize + S(2);
     int labelH = S(16);
-    sourcePhonLabel.setBounds(srcKnobX, labelY, knobSize, labelH);
+    actualPhonLabel.setBounds(actualKnobX, labelY, knobSize, labelH);
     targetPhonLabel.setBounds(tgtKnobX, labelY, knobSize, labelH);
-    phonUnitLabel.setBounds(srcKnobX + knobSize, labelY, knobGap, labelH);
+    phonUnitLabel.setBounds(actualKnobX + knobSize, labelY, knobGap, labelH);
 
-    sourceLearnBtn.setBounds(srcKnobX + knobSize + S(4), knobY + S(30), S(28), S(20));
+    sourceLearnBtn.setBounds(actualKnobX + knobSize + S(4), knobY + S(30), S(28), S(20));
     targetLearnBtn.setBounds(tgtKnobX + knobSize + S(4), knobY + S(30), S(28), S(20));
 
     int rightX = tgtKnobX + knobSize + S(40);
@@ -602,9 +602,9 @@ void MainComponent::resized()
     appTitle.setFont(vikingFont.withHeight(16.0f * uiScale));
 
     auto fontOpts = juce::FontOptions(13.0f * uiScale);
-    sourcePhonLabel.setFont(fontOpts);
+    actualPhonLabel.setFont(fontOpts);
     targetPhonLabel.setFont(fontOpts);
-    sourceTitle.setFont(fontOpts);
+    actualTitle.setFont(fontOpts);
     targetTitle.setFont(fontOpts);
     phonUnitLabel.setFont(fontOpts);
     midiDeviceLabel.setFont(fontOpts);
@@ -658,7 +658,7 @@ void MainComponent::handleIncomingMidiMessage(juce::MidiInput*, const juce::Midi
     if (cc == midiSourceCC) {
         int idx = juce::jlimit(20, 100, juce::roundToInt(20.0f + val / 127.0f * 80.0f));
         juce::MessageManager::callAsync([this, idx] {
-            sourcePhonSlider.setValue((double)idx);
+            actualPhonSlider.setValue((double)idx);
             rebuildFilter();
         });
     }
@@ -706,7 +706,7 @@ void MainComponent::setUIScale(float scale)
 
 std::vector<float> MainComponent::buildIR(double sampleRate)
 {
-    if (sourcePhon == targetPhon)
+    if (actualPhon == targetPhon)
     {
         const int halfTaps = 1024;
         freqRespFrequencies.resize(halfTaps + 1);
@@ -742,7 +742,7 @@ std::vector<float> MainComponent::buildIR(double sampleRate)
     };
 
     for (size_t i = 0; i < 29; ++i)
-        delta.push_back(getSPL(i, sourcePhon) - getSPL(i, targetPhon));
+        delta.push_back(getSPL(i, actualPhon) - getSPL(i, targetPhon));
 
     double extensionDelta = delta.back();
     for (double xf : iso226::xfreqs) {
