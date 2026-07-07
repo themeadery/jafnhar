@@ -33,6 +33,8 @@ MainComponent::MainComponent()
                  juce::SystemStats::getOperatingSystemName().toStdString()
     );
 
+    setWantsKeyboardFocus(true);
+
     bypassToggle.setButtonText("Bypass");
     bypassToggle.setToggleState(false, juce::dontSendNotification); // Default to disabled
     bypassToggle.onClick = [this] { bypass = bypassToggle.getToggleState(); };
@@ -619,6 +621,16 @@ void MainComponent::mouseDown(const juce::MouseEvent& event)
 void MainComponent::mouseDrag(const juce::MouseEvent& event)
 {
     windowDragger.dragComponent(getTopLevelComponent(), event, nullptr);
+}
+
+bool MainComponent::keyPressed(const juce::KeyPress& key)
+{
+    if (key.getKeyCode() == 'b' || key.getKeyCode() == 'B')
+    {
+        bypassToggle.setToggleState(!bypassToggle.getToggleState(), juce::sendNotification);
+        return true;
+    }
+    return false;
 }
 
 void MainComponent::timerCallback()

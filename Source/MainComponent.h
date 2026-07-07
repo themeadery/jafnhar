@@ -31,6 +31,7 @@ public:
     void handleIncomingMidiMessage(juce::MidiInput* source, const juce::MidiMessage& message) override;
     void mouseDown(const juce::MouseEvent& event) override;
     void mouseDrag(const juce::MouseEvent& event) override;
+    bool keyPressed(const juce::KeyPress& key) override;
 
 private:
     class GearButton : public juce::Component
