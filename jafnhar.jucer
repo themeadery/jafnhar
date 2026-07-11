@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <JUCERPROJECT id="d9geK4" name="jafnhar" projectType="guiapp" useAppConfig="0"
-              addUsingNamespaceToJuceHeader="0" jucerFormatVersion="1" version="0.0.1"
+              addUsingNamespaceToJuceHeader="0" jucerFormatVersion="1" version="0.0.2"
               companyName="The Meadery" companyWebsite="www.themeadery.buzz">
   <MAINGROUP id="c5989V" name="jafnhar">
     <GROUP id="{E1B96927-BD32-DBA1-311A-6DD0A425B4D1}" name="Source">
