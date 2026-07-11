@@ -19,6 +19,9 @@ MainComponent::MainComponent()
     auto* props = appProperties.getUserSettings();
     uiScale = (float)props->getDoubleValue("uiScale", 1.0);
 
+    actualPhon = (double)juce::roundToInt(props->getDoubleValue("actualPhon", 60.0));
+    targetPhon = (double)juce::roundToInt(props->getDoubleValue("targetPhon", 80.0));
+
     auto installId = props->getValue("installId");
     if (installId.isEmpty())
     {
@@ -49,17 +52,21 @@ MainComponent::MainComponent()
 
     actualPhonSlider.setSliderStyle(juce::Slider::RotaryVerticalDrag);
     actualPhonSlider.setRange(20.0, 100.0, 1.0);
-    actualPhonSlider.setValue(60.0, juce::dontSendNotification);
+    actualPhonSlider.setValue(actualPhon, juce::dontSendNotification);
     actualPhonSlider.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
     actualPhonSlider.onValueChange = [this] {
-        actualPhon = actualPhonSlider.getValue();
+        actualPhon = (double)juce::roundToInt(actualPhonSlider.getValue());
         actualPhonLabel.setText(juce::String((int)actualPhon), juce::dontSendNotification);
         updateFreqResponse(currentSampleRate);
         repaint();
     };
-    actualPhonSlider.onDragEnd = [this] { rebuildFilter(); };
+    actualPhonSlider.onDragEnd = [this] {
+        rebuildFilter();
+        appProperties.getUserSettings()->setValue("actualPhon", juce::roundToInt(actualPhon));
+        appProperties.saveIfNeeded();
+    };
     addAndMakeVisible(actualPhonSlider);
-    setupPhonLabel(actualPhonLabel, "60");
+    setupPhonLabel(actualPhonLabel, juce::String((int)actualPhon));
     addAndMakeVisible(actualPhonLabel);
 
     setupPhonLabel(actualTitle, "Actual");
@@ -67,17 +74,21 @@ MainComponent::MainComponent()
 
     targetPhonSlider.setSliderStyle(juce::Slider::RotaryVerticalDrag);
     targetPhonSlider.setRange(20.0, 100.0, 1.0);
-    targetPhonSlider.setValue(80.0, juce::dontSendNotification);
+    targetPhonSlider.setValue(targetPhon, juce::dontSendNotification);
     targetPhonSlider.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
     targetPhonSlider.onValueChange = [this] {
-        targetPhon = targetPhonSlider.getValue();
+        targetPhon = (double)juce::roundToInt(targetPhonSlider.getValue());
         targetPhonLabel.setText(juce::String((int)targetPhon), juce::dontSendNotification);
         updateFreqResponse(currentSampleRate);
         repaint();
     };
-    targetPhonSlider.onDragEnd = [this] { rebuildFilter(); };
+    targetPhonSlider.onDragEnd = [this] {
+        rebuildFilter();
+        appProperties.getUserSettings()->setValue("targetPhon", juce::roundToInt(targetPhon));
+        appProperties.saveIfNeeded();
+    };
     addAndMakeVisible(targetPhonSlider);
-    setupPhonLabel(targetPhonLabel, "80");
+    setupPhonLabel(targetPhonLabel, juce::String((int)targetPhon));
     addAndMakeVisible(targetPhonLabel);
 
     setupPhonLabel(targetTitle, "Target");
@@ -738,6 +749,8 @@ void MainComponent::handleIncomingMidiMessage(juce::MidiInput*, const juce::Midi
         juce::MessageManager::callAsync([this, idx] {
             actualPhonSlider.setValue((double)idx);
             rebuildFilter();
+            appProperties.getUserSettings()->setValue("actualPhon", idx);
+            appProperties.saveIfNeeded();
         });
     }
     if (cc == midiTargetCC) {
@@ -745,6 +758,8 @@ void MainComponent::handleIncomingMidiMessage(juce::MidiInput*, const juce::Midi
         juce::MessageManager::callAsync([this, idx] {
             targetPhonSlider.setValue((double)idx);
             rebuildFilter();
+            appProperties.getUserSettings()->setValue("targetPhon", idx);
+            appProperties.saveIfNeeded();
         });
     }
     if (cc == midiVolumeCC) {
