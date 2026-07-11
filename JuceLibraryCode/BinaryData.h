@@ -9,10 +9,10 @@
 namespace BinaryData
 {
     extern const char*   icon_large_png;
-    const int            icon_large_pngSize = 2219;
+    const int            icon_large_pngSize = 4788;
 
     extern const char*   icon_small_png;
-    const int            icon_small_pngSize = 248;
+    const int            icon_small_pngSize = 574;
 
     extern const char*   Viking_ttf;
     const int            Viking_ttfSize = 52212;
