@@ -31,9 +31,10 @@ MainComponent::MainComponent()
 
     setSize (juce::roundToInt(1280.0f * uiScale), juce::roundToInt(536.0f * uiScale));
 
-    spdlog::info("jafnhar v{} starting — OS: {}",
+    spdlog::info("jafnhar v{} starting — OS: {} — spdlog v{}.{}.{}",
                  ProjectInfo::versionString,
-                 juce::SystemStats::getOperatingSystemName().toStdString()
+                 juce::SystemStats::getOperatingSystemName().toStdString(),
+                 SPDLOG_VER_MAJOR, SPDLOG_VER_MINOR, SPDLOG_VER_PATCH
     );
 
     setWantsKeyboardFocus(true);
