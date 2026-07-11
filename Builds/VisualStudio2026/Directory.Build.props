@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project>
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <AdditionalIncludeDirectories>
+        ..\..\Source\third_party\spdlog\include;%(AdditionalIncludeDirectories)
+      </AdditionalIncludeDirectories>
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+  </ItemDefinitionGroup>
+</Project>
