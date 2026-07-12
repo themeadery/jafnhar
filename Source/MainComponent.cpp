@@ -641,7 +641,7 @@ void MainComponent::resized()
     int rightX = tgtKnobX + knobSize + S(40);
     midiDeviceLabel.setBounds(rightX, titleY, S(180), S(14));
     midiDeviceCombo.setBounds(rightX, titleY + S(14), S(180), S(18));
-    bypassToggle.setBounds(rightX, knobY + S(65), S(110), S(22));
+    bypassToggle.setBounds(S(8), getHeight() - S(22) - S(4), S(84), S(22));
 
     int logoSize = S(110);
     int logoX = (rightX + S(180) + volKnobX - logoSize) / 2;
