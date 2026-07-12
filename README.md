@@ -27,10 +27,10 @@ The settings database and logs are located in the following directories:
 
 | File        | Windows                                 | macOS                                                    | Linux                                     |
 |-------------|-----------------------------------------|----------------------------------------------------------|-------------------------------------------|
-| `.settings` | `%APPDATA%\jafnhar\jafnhar.settings`    | `~/Library/Application Support/jafnhar/jafnhar.settings` | `~/.config/jafnhar/jafnhar.settings`      |
+| `.settings` | `%APPDATA%\jafnhar\jafnhar.settings`    | `~/Library/Application Support/jafnhar/jafnhar.settings` | `~/jafnhar/jafnhar.settings`              |
 | `log.txt`   | `%APPDATA%\jafnhar\log.txt`             | `~/Library/Application Support/jafnhar/log.txt`          | `~/.config/jafnhar/log.txt`               |
 
-The alpha release will be shipped without an installer. It can be launched from any directory. For now I am only compiling for Windows, so the macOS and Linux directories above are not tested.
+The alpha release will be shipped without an installer. It can be launched from any directory. For now I am only compiling for Windows and Linux, so the macOS directories above are not tested.
 
 ## FAQ
 
