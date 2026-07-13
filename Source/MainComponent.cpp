@@ -682,6 +682,13 @@ void MainComponent::resized()
 
 void MainComponent::mouseDown(const juce::MouseEvent& event)
 {
+    learningForSource = false;
+    learningForTarget = false;
+    learningForVolume = false;
+    sourceLearnBtn.setButtonText("L");
+    targetLearnBtn.setButtonText("L");
+    volumeLearnBtn.setButtonText("L");
+
     if (event.y < juce::roundToInt(40.0f * uiScale))
         windowDragger.startDraggingComponent(getTopLevelComponent(), event);
 }
