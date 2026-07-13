@@ -10,7 +10,7 @@ Imagine you are listening to a song at low volume levels, say ~60 dB. You might 
 
 ## Requirements
 
-- ASIO Audio Interface
+- ASIO® Audio Interface
 - Audio Loopback
 - Windows 10/11
 - MIDI Controller (optional)
@@ -53,3 +53,8 @@ Joined together, **Jafnhár** literally means "equally loud" or "of the same hei
 
 - Calibration feature to allow locking master volume to Actual/Target with ratio
 - In-app update system
+
+## Attributions
+
+![ASIO logo](assets/ASIO-compatible-logo-Steinberg-TM-BW.png)  
+ASIO is a registered trademark of Steinberg Media Technologies GmbH.
