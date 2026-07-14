@@ -10,27 +10,34 @@ Imagine you are listening to a song at low volume levels, say ~60 dB. You might 
 
 ## Requirements
 
-- ASIO® Audio Interface
-- Audio Loopback
-- Windows 10/11
-- MIDI Controller (optional)
+### Windows
 
-A MIDI controller is optional so that you may control the knobs without using the mouse. The idea in the future is to be able to control the app without having it in focus, especially the master volume with respect to the actual/target knob ratio.
+- ASIO® Audio Interface
+- Windows 10/11
+- Audio Loopback
+
+### Linux
+
+- JACK Audio Connection Kit
+- libfmt10
+- Audio Loopback
+
+A MIDI controller is optional so that you may control the knobs without using the mouse and without having the app in focus.
 
 ## Audio Routing
 
-You will need to loopback your audio so you can process it through the app. I personally do this with my SPDIF out/in. This let's Windows apps that can only sink to WASAPI/MME/DirectSound get processed. If your audio interface comes with a clever way to loopback properly you can use that as well. Using VB-Audio solutions such as VB-Cable and Matrix will work as well.
+You will need to loopback your audio so you can process it through the app. I personally do this physically with my SPDIF out/in. This lets Windows apps that can only sink to WASAPI/MME/DirectSound get processed. If your audio interface comes with a clever way to loopback properly you can use that as well. Using VB-Audio solutions such as VB-Cable and Matrix will work as well.
 
 ## File Locations
 
 The settings database and logs are located in the following directories:
 
-| File        | Windows                                 | macOS                                                    | Linux                                     |
-|-------------|-----------------------------------------|----------------------------------------------------------|-------------------------------------------|
-| `.settings` | `%APPDATA%\jafnhar\jafnhar.settings`    | `~/Library/Application Support/jafnhar/jafnhar.settings` | `~/jafnhar/jafnhar.settings`              |
-| `log.txt`   | `%APPDATA%\jafnhar\log.txt`             | `~/Library/Application Support/jafnhar/log.txt`          | `~/.config/jafnhar/log.txt`               |
+| File        | Windows                                 | Linux                                     |
+|-------------|-----------------------------------------|-------------------------------------------|
+| `.settings` | `%APPDATA%\jafnhar\jafnhar.settings`    | `~/jafnhar/jafnhar.settings`              |
+| `log.txt`   | `%APPDATA%\jafnhar\log.txt`             | `~/.config/jafnhar/log.txt`               |
 
-The alpha release will be shipped without an installer. It can be launched from any directory. For now I am only compiling for Windows and Linux, so the macOS directories above are not tested.
+The alpha releases will be shipped without an installer. It can be launched from any directory.
 
 ## FAQ
 
@@ -53,6 +60,7 @@ Joined together, **Jafnhár** literally means "equally loud" or "of the same hei
 
 - Calibration feature to allow locking master volume to Actual/Target with ratio
 - In-app update system
+- EBU R128 option
 
 ## Attributions
 

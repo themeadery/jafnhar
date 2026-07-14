@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <JUCERPROJECT id="d9geK4" name="jafnhar" projectType="guiapp" useAppConfig="0"
-              addUsingNamespaceToJuceHeader="0" jucerFormatVersion="1" version="0.0.2"
+              addUsingNamespaceToJuceHeader="0" jucerFormatVersion="1" version="0.1.0"
               companyName="The Meadery" companyWebsite="www.themeadery.buzz">
   <MAINGROUP id="c5989V" name="jafnhar">
     <GROUP id="{E1B96927-BD32-DBA1-311A-6DD0A425B4D1}" name="Source">
@@ -33,7 +33,7 @@
     <MODULE id="juce_gui_basics" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="juce_gui_extra" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
   </MODULES>
-   <JUCEOPTIONS JUCE_STRICT_REFCOUNTEDPOINTER="1" JUCE_USE_ANDROID_OBOE="0" JUCE_ALSA="0"
+  <JUCEOPTIONS JUCE_STRICT_REFCOUNTEDPOINTER="1" JUCE_USE_ANDROID_OBOE="0" JUCE_ALSA="0"
                JUCE_DIRECTSOUND="0" JUCE_WASAPI="0" JUCE_ASIO="1" JUCE_WEB_BROWSER="0"/>
   <EXPORTFORMATS>
     <VS2026 targetFolder="Builds/VisualStudio2026" extraSearchPaths="../../Source/third_party/spdlog/include"
