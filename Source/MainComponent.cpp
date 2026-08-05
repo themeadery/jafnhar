@@ -388,6 +388,16 @@ void MainComponent::paint (juce::Graphics& g)
     int outputLabelAreaWidth = 50;
     int outputMeterStartX = windowWidth - outputLabelAreaWidth - (6 * spacing) - 10;
 
+    auto meterPos = [](float db) -> float
+    {
+        if (db > -20.0f) return 1.0f - 0.45f * (db / -20.0f);
+        if (db > -60.0f) return 0.55f - 0.45f * ((db + 20.0f) / -40.0f);
+        return 0.10f - 0.10f * ((db + 60.0f) / -46.0f);
+    };
+
+    const float labelDbs[] = { 0.0f, -3.0f, -6.0f, -9.0f, -12.0f, -15.0f, -18.0f, -24.0f,
+                               -36.0f, -48.0f, -72.0f, -96.0f };
+
     g.setColour (juce::Colours::grey);
 
     // Input meter outlines
@@ -408,19 +418,19 @@ void MainComponent::paint (juce::Graphics& g)
     g.setColour (juce::Colours::white);
 
     // Left side labels (inputs)
-    for (int db = 0; db >= -144; db -= 24)
+    for (float db : labelDbs)
     {
-        float normalizedPos = (float)(db + 144) / 144.0f;
+        float normalizedPos = juce::jlimit(0.0f, 1.0f, meterPos(db));
         int y = meterTop + meterHeight - (int)(normalizedPos * meterHeight);
-        g.drawText (juce::String (db), 5, y - 4, 40, 8, juce::Justification::right);
+        g.drawText (juce::String ((int)db), 5, y - 4, 40, 8, juce::Justification::right);
     }
 
     // Right side labels (outputs)
-    for (int db = 0; db >= -144; db -= 24)
+    for (float db : labelDbs)
     {
-        float normalizedPos = (float)(db + 144) / 144.0f;
+        float normalizedPos = juce::jlimit(0.0f, 1.0f, meterPos(db));
         int y = meterTop + meterHeight - (int)(normalizedPos * meterHeight);
-        g.drawText (juce::String (db), windowWidth - 45, y - 4, 40, 8, juce::Justification::left);
+        g.drawText (juce::String ((int)db), windowWidth - 45, y - 4, 40, 8, juce::Justification::left);
     }
 
     g.setColour (juce::Colours::white);
@@ -429,8 +439,7 @@ void MainComponent::paint (juce::Graphics& g)
     for (int i = 0; i < 6; ++i)
     {
         float dBFS = 20.0f * std::log10(inputLevels[i]);
-        float normalizedPos = (dBFS + 144.0f) / 144.0f;
-        normalizedPos = std::max(0.0f, std::min(1.0f, normalizedPos));
+        float normalizedPos = juce::jlimit(0.0f, 1.0f, meterPos(dBFS));
 
         int barHeight = (int)(normalizedPos * meterHeight);
         int x = inputMeterStartX + i * spacing;
@@ -442,8 +451,7 @@ void MainComponent::paint (juce::Graphics& g)
     for (int i = 0; i < 6; ++i)
     {
         float dBFS = 20.0f * std::log10(outputLevels[i]);
-        float normalizedPos = (dBFS + 144.0f) / 144.0f;
-        normalizedPos = std::max(0.0f, std::min(1.0f, normalizedPos));
+        float normalizedPos = juce::jlimit(0.0f, 1.0f, meterPos(dBFS));
 
         int barHeight = (int)(normalizedPos * meterHeight);
         int x = outputMeterStartX + i * spacing;
