@@ -16,6 +16,13 @@ public:
     // then measures the output. Works on channels 0/1 in place.
     void process(float* left, float* right, int numSamples);
 
+    // Call from the audio thread with the raw source channels (before the ISO 226
+    // filter) to measure the true input loudness. Independent of process().
+    void processSource(const float* left, const float* right, int numSamples)
+    {
+        sourceMeter.process(left, right, numSamples);
+    }
+
     void setEnabled(bool shouldBeEnabled) { enabled.store(shouldBeEnabled, std::memory_order_relaxed); }
     bool isEnabled() const               { return enabled.load(std::memory_order_relaxed); }
 
@@ -28,10 +35,11 @@ public:
 
     const LoudnessMeter& getInputMeter() const  { return inputMeter; }
     const LoudnessMeter& getOutputMeter() const { return outputMeter; }
+    const LoudnessMeter& getSourceMeter() const { return sourceMeter; }
     float getAppliedGainDb() const              { return appliedGainDb.load(std::memory_order_relaxed); }
 
 private:
-    LoudnessMeter inputMeter, outputMeter;
+    LoudnessMeter sourceMeter, inputMeter, outputMeter;
     std::atomic<float> targetIntegrated { -23.0f };
     std::atomic<float> targetLra { 10.0f };
     std::atomic<float> targetTruePeak { -1.0f };

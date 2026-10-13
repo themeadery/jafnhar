@@ -128,7 +128,7 @@ private:
                                bool shouldDrawButtonAsDown) override
         {
             auto fontSize = fontHeight;
-            auto tickWidth = fontSize * 1.1f;
+            auto tickWidth = fontSize * 1.3f;
 
             drawTickBox (g, button, 4.0f, ((float) button.getHeight() - tickWidth) * 0.5f,
                          tickWidth, tickWidth,
@@ -143,8 +143,81 @@ private:
                               juce::Justification::centredLeft, 10);
         }
 
-        float fontHeight = 11.0f;
+        void drawTickBox (juce::Graphics& g, juce::Component& component,
+                          float x, float y, float w, float h,
+                          bool ticked, bool, bool, bool) override
+        {
+            auto box = juce::Rectangle<float>(x, y, w, h);
+
+            if (ticked)
+            {
+                g.setColour (component.findColour (juce::ToggleButton::tickColourId));
+                g.fillRoundedRectangle (box, 3.0f);
+                g.setColour (juce::Colours::black.withAlpha (0.85f));
+                auto tick = getTickShape (0.95f);
+                g.fillPath (tick, tick.getTransformToScaleToFit (box.reduced (2.0f, 2.5f), false));
+            }
+            else
+            {
+                g.setColour (component.findColour (juce::ToggleButton::tickDisabledColourId));
+                g.drawRoundedRectangle (box, 3.0f, 1.0f);
+            }
+        }
+
+        float fontHeight = 13.0f;
     };
+
+    class KnobLookAndFeel : public juce::LookAndFeel_V4
+    {
+    public:
+        void drawRotarySlider (juce::Graphics& g, int x, int y, int width, int height,
+                               float sliderPos, float rotaryStartAngle, float rotaryEndAngle,
+                               juce::Slider&) override
+        {
+            auto bounds = juce::Rectangle<int> (x, y, width, height).toFloat().reduced (1.0f);
+            auto radius = juce::jmin (bounds.getWidth(), bounds.getHeight()) * 0.5f;
+            auto centreX = bounds.getCentreX();
+            auto centreY = bounds.getCentreY();
+            auto angle = rotaryStartAngle + sliderPos * (rotaryEndAngle - rotaryStartAngle);
+
+            const float arcThickness = juce::jmax (2.0f, radius * 0.12f);
+            auto arcRadius = radius - arcThickness * 0.5f;
+            auto knobRadius = juce::jmax (3.0f, radius - arcThickness - 2.0f);
+
+            juce::Path track;
+            track.addCentredArc (centreX, centreY, arcRadius, arcRadius, 0.0f,
+                                 rotaryStartAngle, rotaryEndAngle, true);
+            g.setColour (juce::Colours::grey.withAlpha (0.3f));
+            g.strokePath (track, juce::PathStrokeType (arcThickness, juce::PathStrokeType::curved,
+                                                       juce::PathStrokeType::rounded));
+
+            juce::Path valueArc;
+            valueArc.addCentredArc (centreX, centreY, arcRadius, arcRadius, 0.0f,
+                                    rotaryStartAngle, angle, true);
+            g.setColour (juce::Colours::lightgrey);
+            g.strokePath (valueArc, juce::PathStrokeType (arcThickness, juce::PathStrokeType::curved,
+                                                          juce::PathStrokeType::rounded));
+
+            auto body = juce::Rectangle<float> (knobRadius * 2.0f, knobRadius * 2.0f)
+                            .withCentre ({ centreX, centreY });
+            g.setColour (juce::Colour (0xff303030));
+            g.fillEllipse (body);
+            g.setColour (juce::Colours::grey.withAlpha (0.6f));
+            g.drawEllipse (body, 1.0f);
+
+            auto pointerThickness = juce::jmax (1.5f, knobRadius * 0.14f);
+            auto pointerInset = juce::jmax (2.0f, knobRadius * 0.16f);
+            auto pointerLength = juce::jmax (2.0f, knobRadius - pointerInset * 2.0f);
+            juce::Path pointer;
+            pointer.addRoundedRectangle (-pointerThickness * 0.5f, -knobRadius + pointerInset,
+                                         pointerThickness, pointerLength, pointerThickness * 0.5f);
+            pointer.applyTransform (juce::AffineTransform::rotation (angle).translated (centreX, centreY));
+            g.setColour (juce::Colours::white);
+            g.fillPath (pointer);
+        }
+    };
+
+    static constexpr float sectionTitleFont = 13.0f;
 
     void initializeISO226Filter(double sampleRate);
     void updateFreqResponse(double sampleRate);
@@ -172,6 +245,7 @@ private:
     juce::String selectedMidiDeviceId;
     juce::String selectedAsioDeviceName;
     juce::TextButton sourceLearnBtn{ "L" }, targetLearnBtn{ "L" };
+    KnobLookAndFeel knobLnf;
     juce::Slider actualPhonSlider;
     juce::Slider targetPhonSlider;
     juce::Label actualTitle;
@@ -184,6 +258,11 @@ private:
     juce::Slider volumeSlider;
     juce::Label volumeLabel;
     juce::Label volumeTitle;
+    juce::Label loudInputHeader;
+    juce::Label loudPostIsoHeader;
+    juce::Label loudOutputHeader;
+    juce::Label loudStatNames[3][4];
+    juce::Label loudStatValues[3][4];
     juce::TextButton volumeLearnBtn{ "L" };
     double actualPhon = 60.0;
     double targetPhon = 80.0;
@@ -231,6 +310,8 @@ private:
     float loudInLra = LoudnessMeter::invalidValue, loudInTp = LoudnessMeter::invalidValue;
     float loudOutM = LoudnessMeter::invalidValue, loudOutI = LoudnessMeter::invalidValue;
     float loudOutLra = LoudnessMeter::invalidValue, loudOutTp = LoudnessMeter::invalidValue;
+    float loudSrcM = LoudnessMeter::invalidValue, loudSrcI = LoudnessMeter::invalidValue;
+    float loudSrcLra = LoudnessMeter::invalidValue, loudSrcTp = LoudnessMeter::invalidValue;
     float loudGainDb = 0.0f;
 
     float uiScale = 1.0f;

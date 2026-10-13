@@ -5,6 +5,7 @@ LoudnessNormalizer::LoudnessNormalizer() = default;
 void LoudnessNormalizer::prepare(double sampleRate, int maxBlockSize)
 {
     sr = sampleRate;
+    sourceMeter.prepare(sampleRate, maxBlockSize);
     inputMeter.prepare(sampleRate, maxBlockSize);
     outputMeter.prepare(sampleRate, maxBlockSize);
     appliedGainDb.store(0.0f, std::memory_order_relaxed);
@@ -12,6 +13,7 @@ void LoudnessNormalizer::prepare(double sampleRate, int maxBlockSize)
 
 void LoudnessNormalizer::reset()
 {
+    sourceMeter.reset();
     inputMeter.reset();
     outputMeter.reset();
     resetRequested.store(true, std::memory_order_release);

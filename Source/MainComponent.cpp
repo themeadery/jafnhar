@@ -87,14 +87,17 @@ MainComponent::MainComponent()
     };
     addAndMakeVisible(bypassToggle);
 
-    auto setupPhonLabel = [](juce::Label& label, const juce::String& text) {
+    auto setupPhonLabel = [](juce::Label& label, const juce::String& text,
+                             juce::Justification just = juce::Justification::centred) {
         label.setText(text, juce::dontSendNotification);
-        label.setJustificationType(juce::Justification::centred);
-        label.setFont(juce::FontOptions(13.0f));
+        label.setJustificationType(just);
+        label.setFont(juce::Font(juce::FontOptions(sectionTitleFont)));
         label.setColour(juce::Label::textColourId, juce::Colours::lightgrey);
+        label.setInterceptsMouseClicks(false, false);
     };
 
     actualPhonSlider.setSliderStyle(juce::Slider::RotaryVerticalDrag);
+    actualPhonSlider.setLookAndFeel(&knobLnf);
     actualPhonSlider.setRange(20.0, 100.0, 1.0);
     actualPhonSlider.setValue(actualPhon, juce::dontSendNotification);
     actualPhonSlider.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
@@ -113,10 +116,11 @@ MainComponent::MainComponent()
     setupPhonLabel(actualPhonLabel, juce::String((int)actualPhon));
     addAndMakeVisible(actualPhonLabel);
 
-    setupPhonLabel(actualTitle, "Actual");
+    setupPhonLabel(actualTitle, "ACTUAL");
     addAndMakeVisible(actualTitle);
 
     targetPhonSlider.setSliderStyle(juce::Slider::RotaryVerticalDrag);
+    targetPhonSlider.setLookAndFeel(&knobLnf);
     targetPhonSlider.setRange(20.0, 100.0, 1.0);
     targetPhonSlider.setValue(targetPhon, juce::dontSendNotification);
     targetPhonSlider.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
@@ -135,13 +139,14 @@ MainComponent::MainComponent()
     setupPhonLabel(targetPhonLabel, juce::String((int)targetPhon));
     addAndMakeVisible(targetPhonLabel);
 
-    setupPhonLabel(targetTitle, "Target");
+    setupPhonLabel(targetTitle, "TARGET");
     addAndMakeVisible(targetTitle);
 
     setupPhonLabel(phonUnitLabel, "phon");
     addAndMakeVisible(phonUnitLabel);
 
     volumeSlider.setSliderStyle(juce::Slider::RotaryVerticalDrag);
+    volumeSlider.setLookAndFeel(&knobLnf);
     volumeSlider.setRange(0.0, 1.0, 0.01);
     volumeSlider.setValue(1.0, juce::dontSendNotification);
     volumeSlider.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
@@ -154,8 +159,28 @@ MainComponent::MainComponent()
     addAndMakeVisible(volumeSlider);
     setupPhonLabel(volumeLabel, "100");
     addAndMakeVisible(volumeLabel);
-    setupPhonLabel(volumeTitle, "Master Volume");
+    setupPhonLabel(volumeTitle, "MASTER VOLUME");
     addAndMakeVisible(volumeTitle);
+
+    setupPhonLabel(loudInputHeader, "INPUT", juce::Justification::left);
+    addAndMakeVisible(loudInputHeader);
+    setupPhonLabel(loudPostIsoHeader, "POST ISO 226", juce::Justification::left);
+    addAndMakeVisible(loudPostIsoHeader);
+    setupPhonLabel(loudOutputHeader, "OUTPUT", juce::Justification::left);
+    addAndMakeVisible(loudOutputHeader);
+
+    const char* statRowNames[4] = { "M", "I", "LRA", "TP" };
+    for (int section = 0; section < 3; ++section)
+        for (int row = 0; row < 4; ++row)
+        {
+            setupPhonLabel(loudStatNames[section][row], statRowNames[row], juce::Justification::left);
+            loudStatNames[section][row].setColour(juce::Label::textColourId, juce::Colours::grey);
+            addAndMakeVisible(loudStatNames[section][row]);
+
+            setupPhonLabel(loudStatValues[section][row], "--", juce::Justification::right);
+            loudStatValues[section][row].setColour(juce::Label::textColourId, juce::Colours::white);
+            addAndMakeVisible(loudStatValues[section][row]);
+        }
 
     loudnessToggle.setButtonText("Normalize");
     loudnessToggle.setToggleState(loudnessEnabled, juce::dontSendNotification);
@@ -167,6 +192,9 @@ MainComponent::MainComponent()
         spdlog::info("Loudness normalization {}", loudnessEnabled ? "enabled" : "disabled");
     };
     loudnessToggle.setLookAndFeel(&loudnessLnf);
+    loudnessToggle.setColour(juce::ToggleButton::textColourId, juce::Colours::lightgrey);
+    loudnessToggle.setColour(juce::ToggleButton::tickColourId, juce::Colours::white);
+    loudnessToggle.setColour(juce::ToggleButton::tickDisabledColourId, juce::Colours::grey.withAlpha(0.7f));
     addAndMakeVisible(loudnessToggle);
 
     loudnessResetButton.setTooltip("Reset Meters");
@@ -182,7 +210,7 @@ MainComponent::MainComponent()
         s.setLookAndFeel(&loudnessLnf);
         s.setSliderStyle(juce::Slider::IncDecButtons);
         s.setRange(lo, hi, step);
-        s.setTextBoxStyle(juce::Slider::TextBoxLeft, false, 52, 20);
+        s.setTextBoxStyle(juce::Slider::TextBoxLeft, false, 48, 20);
         s.setColour(juce::Slider::textBoxTextColourId, juce::Colours::white);
         s.setColour(juce::Slider::textBoxBackgroundColourId, juce::Colours::darkgrey.darker(0.6f));
         s.setColour(juce::Slider::textBoxOutlineColourId, juce::Colours::grey.withAlpha(0.5f));
@@ -445,6 +473,10 @@ void MainComponent::getNextAudioBlock(const juce::AudioSourceChannelInfo& buffer
             peak = std::max(peak, std::abs(inData[i]));
         inputLevels[ch] = std::max(inputLevels[ch] * 0.95f, peak);
     }
+
+    loudnessNormalizer.processSource(bufferToFill.buffer->getReadPointer(4, bufferToFill.startSample),
+                                     bufferToFill.buffer->getReadPointer(5, bufferToFill.startSample),
+                                     bufferToFill.numSamples);
 
     int spectrumAudioTap = spectrumAudioMode.load(std::memory_order_relaxed);
 
@@ -848,48 +880,22 @@ void MainComponent::paint (juce::Graphics& g)
 
     // Loudness normalization block (bottom-right blank area)
     {
-        const int x0 = 430, xMid = 675, x1 = 935;
-        const int leftRuleX = 426;
+        const int x0 = 553, xMid = 785, x1 = 1017;
+        const int knobRuleX = 338, leftRuleX = 549, volumeRuleX = 1021;
         const int topY = 404, hRuleY = 501, bottomY = 534;
 
         g.setColour(juce::Colours::grey.withAlpha(0.5f));
+        g.drawLine((float)knobRuleX, (float)topY, (float)knobRuleX, (float)bottomY, 1.0f);
         g.drawLine((float)leftRuleX, (float)topY, (float)leftRuleX, (float)bottomY, 1.0f);
+        g.drawLine((float)volumeRuleX, (float)topY, (float)volumeRuleX, (float)bottomY, 1.0f);
         g.drawLine((float)xMid, (float)topY, (float)xMid, (float)hRuleY, 1.0f);
         g.drawLine((float)x0, (float)hRuleY, (float)x1, (float)hRuleY, 1.0f);
 
-        g.setFont(juce::Font(juce::FontOptions(12.0f)));
-        g.setColour(juce::Colours::lightgrey);
-        g.drawText("INPUT", 438, 404, 232, 16, juce::Justification::left);
-        g.drawText("OUTPUT", 682, 404, 250, 16, juce::Justification::left);
-
-        auto drawStat = [&](const char* name, float v, const char* unit,
-                            int x, int y, int nameW, int valRight)
-        {
-            g.setColour(juce::Colours::grey);
-            g.drawText(name, x, y, nameW, 18, juce::Justification::left);
-            juce::String text = "--";
-            if (v > -200.0f)
-                text = juce::String(v, 1) + " " + unit;
-            g.setColour(juce::Colours::white);
-            g.drawText(text, x + nameW, y, valRight - (x + nameW), 18, juce::Justification::right);
-        };
-
-        const int rowY[4] = { 422, 442, 462, 482 };
-        drawStat("M",   loudInM,   "LUFS", 438, rowY[0], 36, 668);
-        drawStat("I",   loudInI,   "LUFS", 438, rowY[1], 36, 668);
-        drawStat("LRA", loudInLra, "LU",   438, rowY[2], 36, 668);
-        drawStat("TP",  loudInTp,  "dBTP", 438, rowY[3], 36, 668);
-
-        drawStat("M",   loudOutM,   "LUFS", 682, rowY[0], 36, 930);
-        drawStat("I",   loudOutI,   "LUFS", 682, rowY[1], 36, 930);
-        drawStat("LRA", loudOutLra, "LU",   682, rowY[2], 36, 930);
-        drawStat("TP",  loudOutTp,  "dBTP", 682, rowY[3], 36, 930);
-
-        g.setFont(juce::Font(juce::FontOptions(9.0f)));
+        g.setFont(juce::Font(juce::FontOptions(10.0f)));
         g.setColour(juce::Colours::grey);
-        g.drawText("I",   430, 503, 95, 10, juce::Justification::left);
-        g.drawText("LRA", 528, 503, 95, 10, juce::Justification::left);
-        g.drawText("TP",  626, 503, 95, 10, juce::Justification::left);
+        g.drawText("I",   553, 503, 88, 10, juce::Justification::left);
+        g.drawText("LRA", 649, 503, 88, 10, juce::Justification::left);
+        g.drawText("TP",  745, 503, 88, 10, juce::Justification::left);
     }
 }
 
@@ -898,19 +904,16 @@ void MainComponent::resized()
     auto S = [this](int v) { return juce::roundToInt(v * uiScale); };
 
     int meterHeight = getHeight() - S(60);
-    int spacing = S(10);
-    int inputMeterStartX = S(60);
 
-    int plotX = inputMeterStartX + 6 * spacing + S(15);
     int plotY = S(40);
     int plotH = meterHeight - S(115);
 
     int knobY = plotY + plotH + S(34);
-    int knobSize = S(80);
+    int knobSize = S(64);
     int knobGap = S(34);
 
-    int actualKnobX = plotX;
-    int tgtKnobX = plotX + knobSize + knobGap;
+    int actualKnobX = S(345);
+    int tgtKnobX = actualKnobX + knobSize + knobGap;
 
     actualPhonSlider.setBounds(actualKnobX, knobY, knobSize, knobSize);
     targetPhonSlider.setBounds(tgtKnobX, knobY, knobSize, knobSize);
@@ -924,29 +927,31 @@ void MainComponent::resized()
     int labelH = S(16);
     actualPhonLabel.setBounds(actualKnobX, labelY, knobSize, labelH);
     targetPhonLabel.setBounds(tgtKnobX, labelY, knobSize, labelH);
-    phonUnitLabel.setBounds(actualKnobX + knobSize, labelY, knobGap, labelH);
+    int phonUnitX = actualKnobX + knobSize + knobGap / 2;
+    phonUnitLabel.setBounds(phonUnitX - S(30), labelY, S(60), labelH);
 
-    int volKnobX = getWidth() - knobSize - S(135);
+    int outMeterX = getWidth() - S(120);
+    int volKnobX = outMeterX - S(38) - knobSize;
     volumeSlider.setBounds(volKnobX, knobY, knobSize, knobSize);
-    volumeTitle.setBounds(volKnobX, titleY, knobSize, titleH);
+    volumeTitle.setBounds(volKnobX - S(20), titleY, knobSize + S(40), titleH);
     volumeLabel.setBounds(volKnobX, labelY, knobSize, labelH);
-    volumeLearnBtn.setBounds(volKnobX - S(28) - S(4), knobY + S(30), S(28), S(20));
+    volumeLearnBtn.setBounds(volKnobX + knobSize + S(4), knobY + S(30), S(28), S(20));
 
     sourceLearnBtn.setBounds(actualKnobX + knobSize + S(4), knobY + S(30), S(28), S(20));
     targetLearnBtn.setBounds(tgtKnobX + knobSize + S(4), knobY + S(30), S(28), S(20));
 
     bypassToggle.setBounds(S(8), getHeight() - S(22) - S(4), S(84), S(22));
 
-    loudnessLnf.fontHeight = 11.0f * uiScale;
+    loudnessLnf.fontHeight = 13.0f * uiScale;
     targetISlider.sendLookAndFeelChange();
     targetLraSlider.sendLookAndFeelChange();
     targetTpSlider.sendLookAndFeelChange();
 
-    targetISlider.setBounds(S(430), S(511), S(95), S(22));
-    targetLraSlider.setBounds(S(528), S(511), S(95), S(22));
-    targetTpSlider.setBounds(S(626), S(511), S(95), S(22));
-    loudnessToggle.setBounds(S(732), S(511), S(104), S(22));
-    loudnessResetButton.setBounds(S(846), S(511), S(88), S(22));
+    targetISlider.setBounds(S(553), S(511), S(88), S(22));
+    targetLraSlider.setBounds(S(649), S(511), S(88), S(22));
+    targetTpSlider.setBounds(S(745), S(511), S(88), S(22));
+    loudnessToggle.setBounds(S(845), S(511), S(100), S(22));
+    loudnessResetButton.setBounds(S(953), S(511), S(64), S(22));
 
     int btnSize = S(20);
     int btnTop = S(8);
@@ -967,7 +972,7 @@ void MainComponent::resized()
     appTitle.setBounds(0, S(8), getWidth(), S(20));
     appTitle.setFont(vikingFont.withHeight(16.0f * uiScale));
 
-    auto fontOpts = juce::FontOptions(13.0f * uiScale);
+    auto fontOpts = juce::FontOptions(sectionTitleFont * uiScale);
     actualPhonLabel.setFont(fontOpts);
     targetPhonLabel.setFont(fontOpts);
     actualTitle.setFont(fontOpts);
@@ -975,6 +980,29 @@ void MainComponent::resized()
     phonUnitLabel.setFont(fontOpts);
     volumeLabel.setFont(fontOpts);
     volumeTitle.setFont(fontOpts);
+    loudInputHeader.setFont(fontOpts);
+    loudPostIsoHeader.setFont(fontOpts);
+    loudOutputHeader.setFont(fontOpts);
+
+    loudInputHeader.setBounds(S(134), S(404), S(197), S(16));
+    loudPostIsoHeader.setBounds(S(561), S(404), S(224), S(16));
+    loudInputHeader.setBounds(S(134), S(404), S(197), S(16));
+    loudPostIsoHeader.setBounds(S(561), S(404), S(224), S(16));
+    loudOutputHeader.setBounds(S(793), S(404), S(216), S(16));
+
+    const int statX[3] = { 134, 561, 793 };
+    const int statValRight[3] = { 331, 777, 1009 };
+    const int statY[4] = { 422, 442, 462, 482 };
+    for (int section = 0; section < 3; ++section)
+        for (int row = 0; row < 4; ++row)
+        {
+            const int x = statX[section];
+            loudStatNames[section][row].setFont(fontOpts);
+            loudStatValues[section][row].setFont(fontOpts);
+            loudStatNames[section][row].setBounds(S(x), S(statY[row]), S(36), S(16));
+            loudStatValues[section][row].setBounds(S(x + 36), S(statY[row]),
+                                                   S(statValRight[section] - x - 36), S(16));
+        }
 }
 
 void MainComponent::mouseDown(const juce::MouseEvent& event)
@@ -1026,6 +1054,12 @@ void MainComponent::updateLoudnessReadouts()
 {
     const auto& in = loudnessNormalizer.getInputMeter();
     const auto& out = loudnessNormalizer.getOutputMeter();
+    const auto& src = loudnessNormalizer.getSourceMeter();
+
+    loudSrcM = src.getMomentaryLufs();
+    loudSrcI = src.getIntegratedLufs();
+    loudSrcLra = src.getLoudnessRange();
+    loudSrcTp = src.getTruePeakDb();
 
     loudInM = in.getMomentaryLufs();
     loudInI = in.getIntegratedLufs();
@@ -1038,11 +1072,34 @@ void MainComponent::updateLoudnessReadouts()
     loudOutTp = out.getTruePeakDb();
 
     loudGainDb = loudnessNormalizer.getAppliedGainDb();
+
+    auto setStat = [](juce::Label& label, float value, const char* unit)
+    {
+        label.setText(value <= -200.0f ? juce::String("--")
+                                       : juce::String(value, 1) + " " + unit,
+                      juce::dontSendNotification);
+    };
+
+    setStat(loudStatValues[0][0], loudSrcM,   "LUFS");
+    setStat(loudStatValues[0][1], loudSrcI,   "LUFS");
+    setStat(loudStatValues[0][2], loudSrcLra, "LU");
+    setStat(loudStatValues[0][3], loudSrcTp,  "dBTP");
+
+    setStat(loudStatValues[1][0], loudInM,   "LUFS");
+    setStat(loudStatValues[1][1], loudInI,   "LUFS");
+    setStat(loudStatValues[1][2], loudInLra, "LU");
+    setStat(loudStatValues[1][3], loudInTp,  "dBTP");
+
+    setStat(loudStatValues[2][0], loudOutM,   "LUFS");
+    setStat(loudStatValues[2][1], loudOutI,   "LUFS");
+    setStat(loudStatValues[2][2], loudOutLra, "LU");
+    setStat(loudStatValues[2][3], loudOutTp,  "dBTP");
 }
 
 void MainComponent::resetLoudness()
 {
     loudnessNormalizer.reset();
+    loudSrcM = loudSrcI = loudSrcLra = loudSrcTp = LoudnessMeter::invalidValue;
     loudInM = loudInI = loudInLra = loudInTp = LoudnessMeter::invalidValue;
     loudOutM = loudOutI = loudOutLra = loudOutTp = LoudnessMeter::invalidValue;
     repaint();
