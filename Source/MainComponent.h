@@ -155,6 +155,8 @@ private:
     void updateLoudnessReadouts();
     void resetLoudness();
     void openMidiDevice(const juce::String& identifier);
+    juce::StringArray getAsioDeviceNames();
+    void selectAsioDevice(const juce::String& deviceName);
 
     float inputLevels[6] = {};
     float outputLevels[6] = {};
@@ -162,6 +164,7 @@ private:
     bool bypass = false;
     std::unique_ptr<juce::MidiInput> midiInput;
     juce::String selectedMidiDeviceId;
+    juce::String selectedAsioDeviceName;
     juce::TextButton sourceLearnBtn{ "L" }, targetLearnBtn{ "L" };
     juce::Slider actualPhonSlider;
     juce::Slider targetPhonSlider;

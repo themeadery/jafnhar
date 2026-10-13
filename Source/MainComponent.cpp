@@ -51,7 +51,10 @@ MainComponent::MainComponent()
 
     bypassToggle.setButtonText("Bypass");
     bypassToggle.setToggleState(false, juce::dontSendNotification); // Default to disabled
-    bypassToggle.onClick = [this] { bypass = bypassToggle.getToggleState(); };
+    bypassToggle.onClick = [this] {
+        bypass = bypassToggle.getToggleState();
+        spdlog::info("Bypass {}", bypass ? "enabled" : "disabled");
+    };
     addAndMakeVisible(bypassToggle);
 
     auto setupPhonLabel = [](juce::Label& label, const juce::String& text) {
@@ -131,12 +134,17 @@ MainComponent::MainComponent()
         loudnessNormalizer.setEnabled(loudnessEnabled);
         appProperties.getUserSettings()->setValue("loudnessEnabled", loudnessEnabled);
         appProperties.saveIfNeeded();
+        spdlog::info("Loudness normalization {}", loudnessEnabled ? "enabled" : "disabled");
     };
     loudnessToggle.setLookAndFeel(&loudnessLnf);
     addAndMakeVisible(loudnessToggle);
 
+    loudnessResetButton.setTooltip("Reset Meters");
     loudnessResetButton.setLookAndFeel(&loudnessLnf);
-    loudnessResetButton.onClick = [this] { resetLoudness(); };
+    loudnessResetButton.onClick = [this] {
+        spdlog::info("Loudness meters reset");
+        resetLoudness();
+    };
     addAndMakeVisible(loudnessResetButton);
 
     auto setupTargetSlider = [this](juce::Slider& s, double lo, double hi, double step)
@@ -189,6 +197,7 @@ MainComponent::MainComponent()
     addAndMakeVisible(appTitle);
 
     auto savedDeviceId = props->getValue("midiDeviceId", "");
+    selectedAsioDeviceName = props->getValue("asioDeviceName", "");
     midiSourceCC = props->getIntValue("midiSourceCC", -1);
     midiTargetCC = props->getIntValue("midiTargetCC", -1);
     midiVolumeCC = props->getIntValue("midiVolumeCC", -1);
@@ -207,6 +216,7 @@ MainComponent::MainComponent()
     }
 
     // MIDI learn buttons
+    sourceLearnBtn.setTooltip("MIDI Learn");
     sourceLearnBtn.onClick = [this] {
         learningForSource = true;
         learningForTarget = false;
@@ -215,6 +225,7 @@ MainComponent::MainComponent()
     };
     addAndMakeVisible(sourceLearnBtn);
 
+    targetLearnBtn.setTooltip("MIDI Learn");
     targetLearnBtn.onClick = [this] {
         learningForTarget = true;
         learningForSource = false;
@@ -223,6 +234,7 @@ MainComponent::MainComponent()
     };
     addAndMakeVisible(targetLearnBtn);
 
+    volumeLearnBtn.setTooltip("MIDI Learn");
     volumeLearnBtn.onClick = [this] {
         learningForVolume = true;
         learningForSource = false;
@@ -245,6 +257,9 @@ MainComponent::MainComponent()
         // Specify the number of input and output channels that we want to open
         setAudioChannels (6, 6);
     }
+
+    if (selectedAsioDeviceName.isNotEmpty())
+        selectAsioDevice(selectedAsioDeviceName);
 
     minimiseButton.setButtonText("-");
     minimiseButton.onClick = [this] {
@@ -287,9 +302,37 @@ MainComponent::MainComponent()
                                  midiDevices[i].identifier == selectedMidiDeviceId);
         menu.addSubMenu("MIDI Device", midiMenu);
 
+        juce::PopupMenu asioMenu;
+        auto asioNames = getAsioDeviceNames();
+        auto asioActive = deviceManager.getCurrentAudioDeviceType() == "ASIO";
+        asioMenu.addItem(2000, "System Default", true, asioActive && selectedAsioDeviceName.isEmpty());
+        if (asioNames.isEmpty())
+        {
+            asioMenu.addSeparator();
+            asioMenu.addItem(2001, "No ASIO devices", false, false);
+        }
+        else
+        {
+            for (int i = 0; i < asioNames.size(); ++i)
+                asioMenu.addItem(2001 + i, asioNames[i], true,
+                                 asioActive && asioNames[i] == selectedAsioDeviceName);
+        }
+        menu.addSubMenu("ASIO Device", asioMenu);
+
         menu.showMenuAsync(juce::PopupMenu::Options().withMinimumWidth(100),
             [this](int result) {
-                if (result >= 1000) {
+                if (result >= 2000) {
+                    if (result == 2000)
+                        selectAsioDevice({});
+                    else
+                    {
+                        auto names = getAsioDeviceNames();
+                        auto idx = result - 2001;
+                        if (idx < names.size())
+                            selectAsioDevice(names[idx]);
+                    }
+                }
+                else if (result >= 1000) {
                     auto devices = juce::MidiInput::getAvailableDevices();
                     auto idx = result - 1000;
                     if (idx < devices.size())
@@ -302,6 +345,8 @@ MainComponent::MainComponent()
                     spectrumAudioMode.store((int)spectrumMode, std::memory_order_relaxed);
                     appProperties.getUserSettings()->setValue("spectrumMode", (int)spectrumMode);
                     appProperties.saveIfNeeded();
+                    spdlog::info("Spectrum mode: {}",
+                                 result == 1 ? "input" : (result == 2) ? "output" : "off");
                     repaint();
                 }
                 else if (result >= 50) {
@@ -327,6 +372,7 @@ MainComponent::MainComponent()
 
 MainComponent::~MainComponent()
 {
+    spdlog::info("Shutting down");
     // This shuts down the audio device and clears the audio source.
     shutdownAudio();
     appProperties.saveIfNeeded();
@@ -335,6 +381,14 @@ MainComponent::~MainComponent()
 //==============================================================================
 void MainComponent::prepareToPlay (int samplesPerBlockExpected, double sampleRate)
 {
+    auto* dev = deviceManager.getCurrentAudioDevice();
+    spdlog::info("Audio device: '{}' @ {:.0f} Hz, block {}, {} in / {} out",
+                 dev ? dev->getName().toStdString() : "none",
+                 sampleRate,
+                 samplesPerBlockExpected,
+                 dev ? dev->getActiveInputChannels().countNumberOfSetBits() : 0,
+                 dev ? dev->getActiveOutputChannels().countNumberOfSetBits() : 0);
+
     currentSampleRate = sampleRate;
     spec.sampleRate = sampleRate;
     spec.maximumBlockSize = samplesPerBlockExpected;
@@ -955,7 +1009,56 @@ void MainComponent::openMidiDevice(const juce::String& identifier)
         selectedMidiDeviceId = d.identifier;
         appProperties.getUserSettings()->setValue("midiDeviceId", d.identifier);
         appProperties.saveIfNeeded();
+        spdlog::info("MIDI device selected: {}", d.name.toStdString());
         return;
+    }
+}
+
+juce::StringArray MainComponent::getAsioDeviceNames()
+{
+    for (auto* type : deviceManager.getAvailableDeviceTypes())
+    {
+        if (type->getTypeName() == "ASIO")
+        {
+            type->scanForDevices();
+            return type->getDeviceNames();
+        }
+    }
+    return {};
+}
+
+void MainComponent::selectAsioDevice(const juce::String& deviceName)
+{
+    deviceManager.setCurrentAudioDeviceType("ASIO", true);
+
+    if (deviceName.isEmpty())
+    {
+        selectedAsioDeviceName = {};
+        appProperties.getUserSettings()->setValue("asioDeviceName", "");
+        appProperties.saveIfNeeded();
+        spdlog::info("ASIO device set to system default");
+        return;
+    }
+
+    juce::AudioDeviceManager::AudioDeviceSetup setup;
+    setup.inputDeviceName  = deviceName;
+    setup.outputDeviceName = deviceName;
+    setup.inputChannels.setRange(0, 6, true);
+    setup.outputChannels.setRange(0, 6, true);
+    setup.sampleRate = 0;
+    setup.bufferSize = 0;
+
+    auto error = deviceManager.setAudioDeviceSetup(setup, true);
+    if (error.isEmpty())
+    {
+        selectedAsioDeviceName = deviceName;
+        appProperties.getUserSettings()->setValue("asioDeviceName", deviceName);
+        appProperties.saveIfNeeded();
+        spdlog::info("ASIO device selected: {}", deviceName.toStdString());
+    }
+    else
+    {
+        spdlog::warn("Failed to open ASIO device '{}': {}", deviceName.toStdString(), error.toStdString());
     }
 }
 
@@ -974,6 +1077,7 @@ void MainComponent::handleIncomingMidiMessage(juce::MidiInput*, const juce::Midi
             sourceLearnBtn.setButtonText("L");
             appProperties.getUserSettings()->setValue("midiSourceCC", midiSourceCC);
             appProperties.saveIfNeeded();
+            spdlog::info("MIDI learn: source = CC {}", midiSourceCC);
         });
         return;
     }
@@ -984,6 +1088,7 @@ void MainComponent::handleIncomingMidiMessage(juce::MidiInput*, const juce::Midi
             targetLearnBtn.setButtonText("L");
             appProperties.getUserSettings()->setValue("midiTargetCC", midiTargetCC);
             appProperties.saveIfNeeded();
+            spdlog::info("MIDI learn: target = CC {}", midiTargetCC);
         });
         return;
     }
@@ -994,6 +1099,7 @@ void MainComponent::handleIncomingMidiMessage(juce::MidiInput*, const juce::Midi
             volumeLearnBtn.setButtonText("L");
             appProperties.getUserSettings()->setValue("midiVolumeCC", midiVolumeCC);
             appProperties.saveIfNeeded();
+            spdlog::info("MIDI learn: volume = CC {}", midiVolumeCC);
         });
         return;
     }
@@ -1027,9 +1133,20 @@ void MainComponent::handleIncomingMidiMessage(juce::MidiInput*, const juce::Midi
 void MainComponent::initializeISO226Filter(double sampleRate)
 {
     currentSampleRate = sampleRate;
+    auto startMs = juce::Time::getMillisecondCounterHiRes();
     auto impulse = buildIR(sampleRate);
+    auto elapsedMs = juce::Time::getMillisecondCounterHiRes() - startMs;
 
-    juce::AudioBuffer<float> irBuffer((int)impulse.size() > 1 ? 1 : 1, (int)impulse.size());
+    if (actualPhon == targetPhon)
+        spdlog::info("ISO 226 filter: bypassed (unit impulse, {} == {} phon @ {:.0f} Hz, {:.2f} ms)",
+                     juce::String(actualPhon).toStdString(), juce::String(targetPhon).toStdString(),
+                     sampleRate, elapsedMs);
+    else
+        spdlog::info("ISO 226 filter built in {:.2f} ms ({} -> {} phon @ {:.0f} Hz, {} taps)",
+                     elapsedMs, juce::String(actualPhon).toStdString(),
+                     juce::String(targetPhon).toStdString(), sampleRate, impulse.size());
+
+    juce::AudioBuffer<float> irBuffer(1, (int)impulse.size());
     irBuffer.copyFrom(0, 0, impulse.data(), (int)impulse.size());
 
     auto loadIR = [&](juce::dsp::Convolution& conv, juce::AudioBuffer<float> bufferToUse) {
@@ -1049,6 +1166,7 @@ void MainComponent::initializeISO226Filter(double sampleRate)
 void MainComponent::setUIScale(float scale)
 {
     uiScale = scale;
+    spdlog::info("UI scale: {}%", juce::roundToInt(scale * 100.0f));
     if (auto* dw = findParentComponentOfClass<juce::DocumentWindow>())
         dw->setSize(juce::roundToInt(1280.0f * scale), juce::roundToInt(536.0f * scale));
     appProperties.getUserSettings()->setValue("uiScale", (double)scale);
