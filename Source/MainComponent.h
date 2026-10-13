@@ -2,6 +2,8 @@
 
 #include <JuceHeader.h>
 #include <juce_dsp/juce_dsp.h>
+#include <array>
+#include <atomic>
 
 //==============================================================================
 /*
@@ -134,6 +136,7 @@ private:
 
     void initializeISO226Filter(double sampleRate);
     void updateFreqResponse(double sampleRate);
+    void updateSpectrum();
     void rebuildFilter();
     void setUIScale(float scale);
     std::vector<float> buildIR(double sampleRate);
@@ -175,6 +178,20 @@ private:
     std::vector<float> freqRespFrequencies;
     std::vector<float> freqRespDb;
     double nyquist = 0.0;
+
+    enum class SpectrumMode { off = 0, input = 1, output = 2 };
+    static constexpr int spectrumFftOrder = 13;
+    static constexpr int spectrumFftSize  = 1 << spectrumFftOrder;
+    static constexpr int spectrumNumBins  = spectrumFftSize / 2 + 1;
+    SpectrumMode spectrumMode = SpectrumMode::output;
+    std::atomic<int> spectrumAudioMode { (int)SpectrumMode::output };
+    juce::dsp::FFT spectrumFft { spectrumFftOrder };
+    juce::dsp::WindowingFunction<float> spectrumWindow { (size_t)spectrumFftSize,
+                                                         juce::dsp::WindowingFunction<float>::hann };
+    std::array<float, spectrumFftSize> spectrumRing {};
+    std::atomic<int> spectrumWritePos { 0 };
+    std::vector<float> spectrumFftData;
+    std::vector<float> spectrumDb;
 
     juce::TextButton minimiseButton;
     juce::TextButton closeButton;

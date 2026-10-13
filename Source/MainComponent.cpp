@@ -22,6 +22,11 @@ MainComponent::MainComponent()
     actualPhon = (double)juce::roundToInt(props->getDoubleValue("actualPhon", 60.0));
     targetPhon = (double)juce::roundToInt(props->getDoubleValue("targetPhon", 80.0));
 
+    spectrumMode = (SpectrumMode)juce::jlimit(0, 2, (int)props->getIntValue("spectrumMode", 2));
+    spectrumAudioMode.store((int)spectrumMode, std::memory_order_relaxed);
+    spectrumFftData.assign(spectrumFftSize * 2, 0.0f);
+    spectrumDb.assign(spectrumNumBins, -100.0f);
+
     auto installId = props->getValue("installId");
     if (installId.isEmpty())
     {
@@ -232,14 +237,34 @@ MainComponent::MainComponent()
 
     settingsButton.onClick = [this] {
         juce::PopupMenu menu;
+
+        juce::PopupMenu scaleMenu;
         std::vector<float> scales = { 0.50f, 0.75f, 0.90f, 1.00f, 1.25f, 1.50f, 1.75f, 2.00f };
-        for (auto s : scales) {
+        for (auto s : scales)
+        {
             auto label = juce::String((int)(s * 100.0f)) + "%";
-            menu.addItem((int)(s * 100.0f), label, true, std::abs(uiScale - s) < 0.001f);
+            scaleMenu.addItem((int)(s * 100.0f), label, true, std::abs(uiScale - s) < 0.001f);
         }
+        menu.addSubMenu("UI Scale", scaleMenu);
+
+        juce::PopupMenu spectrumMenu;
+        spectrumMenu.addItem(1, "Input",  true, spectrumMode == SpectrumMode::input);
+        spectrumMenu.addItem(2, "Output", true, spectrumMode == SpectrumMode::output);
+        spectrumMenu.addItem(3, "Off",    true, spectrumMode == SpectrumMode::off);
+        menu.addSubMenu("Spectrum", spectrumMenu);
+
         menu.showMenuAsync(juce::PopupMenu::Options().withMinimumWidth(100),
             [this](int result) {
-                if (result > 0) {
+                if (result == 1 || result == 2 || result == 3) {
+                    spectrumMode = (result == 1) ? SpectrumMode::input
+                                 : (result == 2) ? SpectrumMode::output
+                                                 : SpectrumMode::off;
+                    spectrumAudioMode.store((int)spectrumMode, std::memory_order_relaxed);
+                    appProperties.getUserSettings()->setValue("spectrumMode", (int)spectrumMode);
+                    appProperties.saveIfNeeded();
+                    repaint();
+                }
+                else if (result >= 50) {
                     auto newScale = (float)result / 100.0f;
                     setUIScale(newScale);
                 }
@@ -293,6 +318,24 @@ void MainComponent::getNextAudioBlock(const juce::AudioSourceChannelInfo& buffer
         inputLevels[ch] = std::max(inputLevels[ch] * 0.95f, peak);
     }
 
+    int spectrumAudioTap = spectrumAudioMode.load(std::memory_order_relaxed);
+
+    auto captureSpectrumTap = [&](int chL, int chR)
+    {
+        auto* l = bufferToFill.buffer->getReadPointer(chL, bufferToFill.startSample);
+        auto* r = bufferToFill.buffer->getReadPointer(chR, bufferToFill.startSample);
+        int pos = spectrumWritePos.load(std::memory_order_relaxed);
+        for (int i = 0; i < bufferToFill.numSamples; ++i)
+        {
+            spectrumRing[(size_t)(pos & (spectrumFftSize - 1))] = (l[i] + r[i]) * 0.5f;
+            ++pos;
+        }
+        spectrumWritePos.store(pos, std::memory_order_release);
+    };
+
+    if (spectrumAudioTap == (int)SpectrumMode::input)
+        captureSpectrumTap(4, 5); // raw ASIO input channels 5 & 6, before they are cleared
+
     for (int ch = 0; ch < 6; ++ch)
     {
         auto* out = bufferToFill.buffer->getWritePointer(ch, bufferToFill.startSample);
@@ -335,6 +378,9 @@ void MainComponent::getNextAudioBlock(const juce::AudioSourceChannelInfo& buffer
         }
         outputLevels[ch] = std::max(outputLevels[ch] * 0.95f, peak);
     }
+
+    if (spectrumAudioTap == (int)SpectrumMode::output)
+        captureSpectrumTap(0, 1); // processed output channels 1 & 2
 }
 
 void MainComponent::releaseResources()
@@ -576,6 +622,46 @@ void MainComponent::paint (juce::Graphics& g)
         juce::PathStrokeType(0.5f).createDashedStroke(zeroPath, zeroPath, dashPattern, 2);
         g.strokePath(zeroPath, juce::PathStrokeType(0.5f));
 
+        // Spectrum analyzer (own unlabeled scale, above grid, behind curve)
+        if (spectrumMode != SpectrumMode::off && !spectrumDb.empty())
+        {
+            juce::Graphics::ScopedSaveState state(g);
+            g.reduceClipRegion(plotBounds);
+
+            auto spectrumYForDb = [&](float db) -> float {
+                float norm = juce::jlimit(0.0f, 1.0f, meterPos(db));
+                return (float)plotBounds.getBottom() - norm * (float)plotBounds.getHeight();
+            };
+
+            juce::Path spectrumPath;
+            int x0 = plotBounds.getX(), x1 = plotBounds.getRight();
+            float freqSpan = logFreqMax - logFreqMin;
+            int lastBin = spectrumNumBins - 1;
+            for (int x = x0; x <= x1; ++x)
+            {
+                float p = (float)(x - x0) / (float)(x1 - x0);
+                float f = std::pow(10.0f, logFreqMin + p * freqSpan);
+                float binPos = f / (float)nyquist * (float)lastBin;
+                int b0 = juce::jlimit(0, lastBin, (int)binPos);
+                int b1 = juce::jmin(b0 + 1, lastBin);
+                float t = binPos - (float)b0;
+                float db = spectrumDb[(size_t)b0] + t * (spectrumDb[(size_t)b1] - spectrumDb[(size_t)b0]);
+                float y = spectrumYForDb(db);
+                if (x == x0) spectrumPath.startNewSubPath((float)x, y);
+                else spectrumPath.lineTo((float)x, y);
+            }
+
+            juce::Path filled = spectrumPath;
+            filled.lineTo((float)x1, (float)plotBounds.getBottom());
+            filled.lineTo((float)x0, (float)plotBounds.getBottom());
+            filled.closeSubPath();
+
+            g.setColour(juce::Colours::grey.withAlpha(0.35f));
+            g.fillPath(filled);
+            g.setColour(juce::Colours::lightgrey.withAlpha(0.9f));
+            g.strokePath(spectrumPath, juce::PathStrokeType(1.5f));
+        }
+
         // Curve
         juce::Path curvePath;
         bool first = true;
@@ -718,6 +804,7 @@ bool MainComponent::keyPressed(const juce::KeyPress& key)
 
 void MainComponent::timerCallback()
 {
+    updateSpectrum();
     repaint();
 }
 
@@ -857,7 +944,7 @@ std::vector<float> MainComponent::buildIR(double sampleRate)
     };
 
     for (size_t i = 0; i < 29; ++i)
-        delta.push_back(getSPL(i, actualPhon) - getSPL(i, targetPhon));
+        delta.push_back(getSPL((int)i, actualPhon) - getSPL((int)i, targetPhon));
 
     double extensionDelta = delta.back();
     for (double xf : iso226::xfreqs) {
@@ -947,4 +1034,29 @@ void MainComponent::rebuildFilter()
 {
     if (currentSampleRate > 0.0)
         initializeISO226Filter(currentSampleRate);
+}
+
+void MainComponent::updateSpectrum()
+{
+    if (spectrumMode == SpectrumMode::off)
+        return;
+
+    const int mask = spectrumFftSize - 1;
+    int writePos = spectrumWritePos.load(std::memory_order_acquire);
+    int start = writePos - spectrumFftSize;
+
+    for (int i = 0; i < spectrumFftSize; ++i)
+        spectrumFftData[(size_t)i] = spectrumRing[(size_t)((start + i) & mask)];
+
+    spectrumWindow.multiplyWithWindowingTable(spectrumFftData.data(), (size_t)spectrumFftSize);
+    spectrumFft.performFrequencyOnlyForwardTransform(spectrumFftData.data(), true);
+
+    const float norm = (float)spectrumFftSize * 0.5f;
+    for (int i = 0; i < spectrumNumBins; ++i)
+    {
+        float db = juce::Decibels::gainToDecibels(spectrumFftData[(size_t)i] / norm, -100.0f);
+        float& s = spectrumDb[(size_t)i];
+        float coeff = (db > s) ? 0.6f : 0.15f;
+        s += (db - s) * coeff;
+    }
 }
