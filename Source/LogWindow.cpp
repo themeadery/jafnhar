@@ -70,5 +70,8 @@ void LogWindow::timerCallback()
         text = text.substring(newlinePos + 1);
 
     if (content != nullptr)
+    {
         content->editor.setText(text);
+        content->editor.moveCaretToEnd();
+    }
 }

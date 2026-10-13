@@ -4,6 +4,36 @@
 #include "Logger.h"
 #include "LogWindow.h"
 
+namespace
+{
+    float smoothBallistic (float current, float target, float attack, float release) noexcept
+    {
+        return current + (target - current) * (target > current ? attack : release);
+    }
+
+    constexpr float meterAttackCoeff  = 1.0f;
+    constexpr float meterReleaseCoeff = 0.12f;
+    constexpr float spectrumOutlineThickness = 1.5f;
+    constexpr int   peakHoldFrames = 30;
+
+    void updatePeakHold (float& peak, int& holdTimer, float value) noexcept
+    {
+        if (value >= peak)
+        {
+            peak = value;
+            holdTimer = peakHoldFrames;
+        }
+        else if (holdTimer > 0)
+        {
+            --holdTimer;
+        }
+        else
+        {
+            peak = smoothBallistic (peak, value, 1.0f, meterReleaseCoeff);
+        }
+    }
+}
+
 //==============================================================================
 MainComponent::MainComponent()
 {
@@ -367,7 +397,7 @@ MainComponent::MainComponent()
 
     Telemetry::sendPing(installId);
 
-    startTimer (42); // ~23.8 fps; both 24 and 23.976 fps round to 42 ms
+    startTimer (33); // 30 fps; meters and spectrum both refresh at this rate
 }
 
 MainComponent::~MainComponent()
@@ -591,7 +621,7 @@ void MainComponent::paint (juce::Graphics& g)
     // Input meters
     for (int i = 0; i < 6; ++i)
     {
-        float dBFS = 20.0f * std::log10(inputLevels[i]);
+        float dBFS = 20.0f * std::log10(meterInDisp[i]);
         float normalizedPos = juce::jlimit(0.0f, 1.0f, meterPos(dBFS));
 
         int barHeight = (int)(normalizedPos * meterHeight);
@@ -603,13 +633,33 @@ void MainComponent::paint (juce::Graphics& g)
     // Output meters
     for (int i = 0; i < 6; ++i)
     {
-        float dBFS = 20.0f * std::log10(outputLevels[i]);
+        float dBFS = 20.0f * std::log10(meterOutDisp[i]);
         float normalizedPos = juce::jlimit(0.0f, 1.0f, meterPos(dBFS));
 
         int barHeight = (int)(normalizedPos * meterHeight);
         int x = outputMeterStartX + i * spacing;
         int y = meterTop + meterHeight - barHeight;
         g.fillRect (x, y, barWidth, barHeight);
+    }
+
+    // Peak-hold ticks
+    g.setColour (juce::Colours::white);
+    auto drawPeakTick = [&](float peak, int x)
+    {
+        if (peak < 1.0e-4f)
+            return;
+
+        float dBFS = 20.0f * std::log10(peak);
+        float normalizedPos = juce::jlimit(0.0f, 1.0f, meterPos(dBFS));
+        float y = (float)meterTop + (float)meterHeight - normalizedPos * (float)meterHeight;
+        g.fillRect((float)x, y - spectrumOutlineThickness * 0.5f,
+                   (float)barWidth, spectrumOutlineThickness);
+    };
+
+    for (int i = 0; i < 6; ++i)
+    {
+        drawPeakTick(meterInPeak[i], inputMeterStartX + i * spacing);
+        drawPeakTick(meterOutPeak[i], outputMeterStartX + i * spacing);
     }
 
     // Frequency response plot
@@ -766,7 +816,7 @@ void MainComponent::paint (juce::Graphics& g)
             g.setColour(juce::Colours::grey.withAlpha(0.35f));
             g.fillPath(filled);
             g.setColour(juce::Colours::lightgrey.withAlpha(0.9f));
-            g.strokePath(spectrumPath, juce::PathStrokeType(1.5f));
+            g.strokePath(spectrumPath, juce::PathStrokeType(spectrumOutlineThickness));
         }
 
         // Curve
@@ -959,6 +1009,16 @@ void MainComponent::timerCallback()
 {
     updateSpectrum();
     updateLoudnessReadouts();
+
+    for (int ch = 0; ch < 6; ++ch)
+    {
+        meterInDisp[ch]  = smoothBallistic (meterInDisp[ch],  inputLevels[ch],  meterAttackCoeff, meterReleaseCoeff);
+        meterOutDisp[ch] = smoothBallistic (meterOutDisp[ch], outputLevels[ch], meterAttackCoeff, meterReleaseCoeff);
+
+        updatePeakHold (meterInPeak[ch],  meterInPeakHold[ch],  meterInDisp[ch]);
+        updatePeakHold (meterOutPeak[ch], meterOutPeakHold[ch], meterOutDisp[ch]);
+    }
+
     repaint();
 }
 
@@ -1325,7 +1385,6 @@ void MainComponent::updateSpectrum()
     {
         float db = juce::Decibels::gainToDecibels(spectrumFftData[(size_t)i] / norm, -100.0f);
         float& s = spectrumDb[(size_t)i];
-        float coeff = (db > s) ? 0.6f : 0.15f;
-        s += (db - s) * coeff;
+        s = smoothBallistic (s, db, 0.6f, 0.15f);
     }
 }

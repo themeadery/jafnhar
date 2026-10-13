@@ -160,6 +160,12 @@ private:
 
     float inputLevels[6] = {};
     float outputLevels[6] = {};
+    float meterInDisp[6] = {};
+    float meterOutDisp[6] = {};
+    float meterInPeak[6] = {};
+    float meterOutPeak[6] = {};
+    int meterInPeakHold[6] = {};
+    int meterOutPeakHold[6] = {};
     juce::ToggleButton bypassToggle;
     bool bypass = false;
     std::unique_ptr<juce::MidiInput> midiInput;
