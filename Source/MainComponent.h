@@ -154,7 +154,7 @@ private:
     juce::Label actualTitle;
     juce::Label targetTitle;
     juce::Label appTitle;
-    juce::Font vikingFont;
+    juce::Font vikingFont{ juce::FontOptions() };
     juce::Label actualPhonLabel;
     juce::Label targetPhonLabel;
     juce::Label phonUnitLabel;
