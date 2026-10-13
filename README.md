@@ -1,6 +1,6 @@
 # Jafnhár
 
-![screenshot](assets/screenshot_2026-07-07.png)
+![screenshot](assets/screenshot_2026-10-13.png)
 
 ## Theory - What Does It Do?
 
@@ -60,7 +60,7 @@ Joined together, **Jafnhár** literally means "equally loud" or "of the same hei
 
 - Calibration feature to allow locking master volume to Actual/Target with ratio
 - In-app update system
-- EBU R128 option
+- ~~EBU R128 option~~
 
 ## Attributions
 
