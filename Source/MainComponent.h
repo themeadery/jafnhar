@@ -4,6 +4,7 @@
 #include <juce_dsp/juce_dsp.h>
 #include <array>
 #include <atomic>
+#include "LoudnessNormalizer.h"
 
 //==============================================================================
 /*
@@ -107,31 +108,42 @@ private:
         std::function<void()> onClick;
     };
 
-    class MeaderyLogo : public juce::Component
+    class LoudnessLookAndFeel : public juce::LookAndFeel_V4
     {
     public:
-        void paint(juce::Graphics& g) override
+        juce::Label* createSliderTextBox (juce::Slider& s) override
         {
-            auto b = getLocalBounds().reduced(juce::roundToInt(getWidth() * 0.05f)).toFloat();
-            auto cx = b.getCentreX(), cy = b.getCentreY();
-            float size = juce::jmin(b.getWidth(), b.getHeight());
-            float s = size / 200.0f;
-
-            juce::Path hex;
-            hex.startNewSubPath(100.0f, 20.0f);
-            hex.lineTo(169.28f, 60.0f);
-            hex.lineTo(169.28f, 140.0f);
-            hex.lineTo(100.0f, 180.0f);
-            hex.lineTo(30.72f, 140.0f);
-            hex.lineTo(30.72f, 60.0f);
-            hex.closeSubPath();
-
-            hex.applyTransform(juce::AffineTransform::scale(s, s)
-                .translated(cx - 100.0f * s, cy - 100.0f * s));
-
-            g.setColour(juce::Colours::grey.darker(0.4f));
-            g.strokePath(hex, juce::PathStrokeType(8.0f));
+            auto* l = juce::LookAndFeel_V4::createSliderTextBox (s);
+            l->setFont (juce::Font (juce::FontOptions (fontHeight)));
+            return l;
         }
+
+        juce::Font getTextButtonFont (juce::TextButton&, int) override
+        {
+            return juce::Font (juce::FontOptions (fontHeight));
+        }
+
+        void drawToggleButton (juce::Graphics& g, juce::ToggleButton& button,
+                               bool shouldDrawButtonAsHighlighted,
+                               bool shouldDrawButtonAsDown) override
+        {
+            auto fontSize = fontHeight;
+            auto tickWidth = fontSize * 1.1f;
+
+            drawTickBox (g, button, 4.0f, ((float) button.getHeight() - tickWidth) * 0.5f,
+                         tickWidth, tickWidth,
+                         button.getToggleState(), button.isEnabled(),
+                         shouldDrawButtonAsHighlighted, shouldDrawButtonAsDown);
+
+            g.setColour (button.findColour (juce::ToggleButton::textColourId));
+            g.setFont (juce::Font (juce::FontOptions (fontSize)));
+            g.drawFittedText (button.getButtonText(),
+                              button.getLocalBounds().withTrimmedLeft (juce::roundToInt (tickWidth) + 10)
+                                                     .withTrimmedRight (2),
+                              juce::Justification::centredLeft, 10);
+        }
+
+        float fontHeight = 11.0f;
     };
 
     void initializeISO226Filter(double sampleRate);
@@ -140,14 +152,16 @@ private:
     void rebuildFilter();
     void setUIScale(float scale);
     std::vector<float> buildIR(double sampleRate);
+    void updateLoudnessReadouts();
+    void resetLoudness();
+    void openMidiDevice(const juce::String& identifier);
 
     float inputLevels[6] = {};
     float outputLevels[6] = {};
     juce::ToggleButton bypassToggle;
     bool bypass = false;
     std::unique_ptr<juce::MidiInput> midiInput;
-    juce::ComboBox midiDeviceCombo;
-    juce::Label midiDeviceLabel;
+    juce::String selectedMidiDeviceId;
     juce::TextButton sourceLearnBtn{ "L" }, targetLearnBtn{ "L" };
     juce::Slider actualPhonSlider;
     juce::Slider targetPhonSlider;
@@ -162,8 +176,6 @@ private:
     juce::Label volumeLabel;
     juce::Label volumeTitle;
     juce::TextButton volumeLearnBtn{ "L" };
-    MeaderyLogo meaderyLogo;
-    juce::Label meaderyLabel;
     double actualPhon = 60.0;
     double targetPhon = 80.0;
     double masterVolume = 1.0;
@@ -198,6 +210,20 @@ private:
     GearButton settingsButton;
     juce::TextButton logButton{ "Log" };
     std::unique_ptr<LogWindow> logWindow;
+
+    LoudnessNormalizer loudnessNormalizer;
+    LoudnessLookAndFeel loudnessLnf;
+    juce::ToggleButton loudnessToggle;
+    juce::TextButton loudnessResetButton{ "Reset" };
+    juce::Slider targetISlider, targetLraSlider, targetTpSlider;
+    bool loudnessEnabled = false;
+    float loudTargetI = -23.0f, loudTargetLra = 10.0f, loudTargetTp = -1.0f;
+    float loudInM = LoudnessMeter::invalidValue, loudInI = LoudnessMeter::invalidValue;
+    float loudInLra = LoudnessMeter::invalidValue, loudInTp = LoudnessMeter::invalidValue;
+    float loudOutM = LoudnessMeter::invalidValue, loudOutI = LoudnessMeter::invalidValue;
+    float loudOutLra = LoudnessMeter::invalidValue, loudOutTp = LoudnessMeter::invalidValue;
+    float loudGainDb = 0.0f;
+
     float uiScale = 1.0f;
     bool noDeviceLogged = false;
     juce::String lastDeviceName;

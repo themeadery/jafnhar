@@ -706,6 +706,12 @@
     <ClCompile Include="..\..\Source\LogWindow.cpp">
       <Filter>jafnhar\Source</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Source\LoudnessMeter.cpp">
+      <Filter>jafnhar\Source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\LoudnessNormalizer.cpp">
+      <Filter>jafnhar\Source</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\JUCE\modules\juce_audio_basics\audio_play_head\juce_AudioPlayHead.cpp">
       <Filter>JUCE Modules\juce_audio_basics\audio_play_head</Filter>
     </ClCompile>
@@ -3742,6 +3748,15 @@
       <Filter>jafnhar\Source</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Source\LogWindow.h">
+      <Filter>jafnhar\Source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\MeaderyLogo.h">
+      <Filter>jafnhar\Source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\LoudnessMeter.h">
+      <Filter>jafnhar\Source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\LoudnessNormalizer.h">
       <Filter>jafnhar\Source</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\JUCE\modules\juce_audio_basics\audio_play_head\juce_AudioPlayHead.h">

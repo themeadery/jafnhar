@@ -27,6 +27,11 @@ MainComponent::MainComponent()
     spectrumFftData.assign(spectrumFftSize * 2, 0.0f);
     spectrumDb.assign(spectrumNumBins, -100.0f);
 
+    loudnessEnabled = props->getBoolValue("loudnessEnabled", false);
+    loudTargetI   = (float)props->getDoubleValue("loudnessTargetI", -23.0);
+    loudTargetLra = (float)props->getDoubleValue("loudnessTargetLRA", 10.0);
+    loudTargetTp  = (float)props->getDoubleValue("loudnessTargetTP", -1.0);
+
     auto installId = props->getValue("installId");
     if (installId.isEmpty())
     {
@@ -119,11 +124,59 @@ MainComponent::MainComponent()
     setupPhonLabel(volumeTitle, "Master Volume");
     addAndMakeVisible(volumeTitle);
 
-    addAndMakeVisible(meaderyLogo);
-    meaderyLabel.setText("The Meadery", juce::dontSendNotification);
-    meaderyLabel.setJustificationType(juce::Justification::centred);
-    meaderyLabel.setColour(juce::Label::textColourId, juce::Colours::grey.darker(0.4f));
-    addAndMakeVisible(meaderyLabel);
+    loudnessToggle.setButtonText("Normalize");
+    loudnessToggle.setToggleState(loudnessEnabled, juce::dontSendNotification);
+    loudnessToggle.onClick = [this] {
+        loudnessEnabled = loudnessToggle.getToggleState();
+        loudnessNormalizer.setEnabled(loudnessEnabled);
+        appProperties.getUserSettings()->setValue("loudnessEnabled", loudnessEnabled);
+        appProperties.saveIfNeeded();
+    };
+    loudnessToggle.setLookAndFeel(&loudnessLnf);
+    addAndMakeVisible(loudnessToggle);
+
+    loudnessResetButton.setLookAndFeel(&loudnessLnf);
+    loudnessResetButton.onClick = [this] { resetLoudness(); };
+    addAndMakeVisible(loudnessResetButton);
+
+    auto setupTargetSlider = [this](juce::Slider& s, double lo, double hi, double step)
+    {
+        s.setLookAndFeel(&loudnessLnf);
+        s.setSliderStyle(juce::Slider::IncDecButtons);
+        s.setRange(lo, hi, step);
+        s.setTextBoxStyle(juce::Slider::TextBoxLeft, false, 52, 20);
+        s.setColour(juce::Slider::textBoxTextColourId, juce::Colours::white);
+        s.setColour(juce::Slider::textBoxBackgroundColourId, juce::Colours::darkgrey.darker(0.6f));
+        s.setColour(juce::Slider::textBoxOutlineColourId, juce::Colours::grey.withAlpha(0.5f));
+        addAndMakeVisible(s);
+    };
+    setupTargetSlider(targetISlider,  -40.0, -5.0, 0.1);
+    setupTargetSlider(targetLraSlider,  0.0, 30.0, 0.1);
+    setupTargetSlider(targetTpSlider,  -9.0,  0.0, 0.1);
+    targetISlider.setValue(loudTargetI, juce::dontSendNotification);
+    targetLraSlider.setValue(loudTargetLra, juce::dontSendNotification);
+    targetTpSlider.setValue(loudTargetTp, juce::dontSendNotification);
+
+    targetISlider.onValueChange = [this] {
+        loudTargetI = (float)targetISlider.getValue();
+        loudnessNormalizer.setTargets(loudTargetI, loudTargetLra, loudTargetTp);
+        appProperties.getUserSettings()->setValue("loudnessTargetI", (double)loudTargetI);
+        appProperties.saveIfNeeded();
+    };
+    targetLraSlider.onValueChange = [this] {
+        loudTargetLra = (float)targetLraSlider.getValue();
+        loudnessNormalizer.setTargets(loudTargetI, loudTargetLra, loudTargetTp);
+        appProperties.getUserSettings()->setValue("loudnessTargetLRA", (double)loudTargetLra);
+        appProperties.saveIfNeeded();
+    };
+    targetTpSlider.onValueChange = [this] {
+        loudTargetTp = (float)targetTpSlider.getValue();
+        loudnessNormalizer.setTargets(loudTargetI, loudTargetLra, loudTargetTp);
+        appProperties.getUserSettings()->setValue("loudnessTargetTP", (double)loudTargetTp);
+        appProperties.saveIfNeeded();
+    };
+    loudnessNormalizer.setEnabled(loudnessEnabled);
+    loudnessNormalizer.setTargets(loudTargetI, loudTargetLra, loudTargetTp);
 
     vikingFont = juce::Font(juce::FontOptions(
         juce::Typeface::createSystemTypefaceFor(
@@ -143,44 +196,15 @@ MainComponent::MainComponent()
     volumeSlider.setValue(masterVolume, juce::dontSendNotification);
     volumeLabel.setText(juce::String(juce::roundToInt(masterVolume * 100.0)), juce::dontSendNotification);
 
-    // MIDI device combo
-    midiDeviceCombo.setTextWhenNoChoicesAvailable("No MIDI inputs");
-    auto midiDevices = juce::MidiInput::getAvailableDevices();
-    for (auto& d : midiDevices)
-        midiDeviceCombo.addItem(d.name, midiDeviceCombo.getNumItems() + 1);
-    midiDeviceCombo.onChange = [this] {
+    // MIDI device selection now lives in the gear settings menu
+    if (savedDeviceId.isNotEmpty())
+        openMidiDevice(savedDeviceId);
+    if (midiInput == nullptr)
+    {
         auto devices = juce::MidiInput::getAvailableDevices();
-        auto idx = midiDeviceCombo.getSelectedItemIndex();
-        if (idx >= 0 && idx < devices.size()) {
-            auto name = devices[idx].name;
-            if (name != lastMidiDeviceName)
-            {
-                spdlog::info("MIDI device found: {}", name.toStdString());
-                lastMidiDeviceName = name;
-            }
-            midiInput.reset();
-            midiInput = juce::MidiInput::openDevice(devices[idx].identifier, this);
-            if (midiInput)
-                midiInput->start();
-            appProperties.getUserSettings()->setValue("midiDeviceId", devices[idx].identifier);
-            appProperties.saveIfNeeded();
-        }
-    };
-    if (savedDeviceId.isNotEmpty()) {
-        auto devices = juce::MidiInput::getAvailableDevices();
-        for (int i = 0; i < devices.size(); ++i) {
-            if (devices[i].identifier == savedDeviceId) {
-                midiDeviceCombo.setSelectedItemIndex(i);
-                break;
-            }
-        }
-    } else if (midiDeviceCombo.getNumItems() > 0) {
-        midiDeviceCombo.setSelectedItemIndex(0);
+        if (!devices.isEmpty())
+            openMidiDevice(devices[0].identifier);
     }
-    addAndMakeVisible(midiDeviceCombo);
-
-    setupPhonLabel(midiDeviceLabel, "MIDI Device");
-    addAndMakeVisible(midiDeviceLabel);
 
     // MIDI learn buttons
     sourceLearnBtn.onClick = [this] {
@@ -253,9 +277,25 @@ MainComponent::MainComponent()
         spectrumMenu.addItem(3, "Off",    true, spectrumMode == SpectrumMode::off);
         menu.addSubMenu("Spectrum", spectrumMenu);
 
+        juce::PopupMenu midiMenu;
+        auto midiDevices = juce::MidiInput::getAvailableDevices();
+        if (midiDevices.isEmpty())
+            midiMenu.addItem(1000, "No MIDI inputs", false, false);
+        else
+            for (int i = 0; i < midiDevices.size(); ++i)
+                midiMenu.addItem(1000 + i, midiDevices[i].name, true,
+                                 midiDevices[i].identifier == selectedMidiDeviceId);
+        menu.addSubMenu("MIDI Device", midiMenu);
+
         menu.showMenuAsync(juce::PopupMenu::Options().withMinimumWidth(100),
             [this](int result) {
-                if (result == 1 || result == 2 || result == 3) {
+                if (result >= 1000) {
+                    auto devices = juce::MidiInput::getAvailableDevices();
+                    auto idx = result - 1000;
+                    if (idx < devices.size())
+                        openMidiDevice(devices[idx].identifier);
+                }
+                else if (result == 1 || result == 2 || result == 3) {
                     spectrumMode = (result == 1) ? SpectrumMode::input
                                  : (result == 2) ? SpectrumMode::output
                                                  : SpectrumMode::off;
@@ -282,7 +322,7 @@ MainComponent::MainComponent()
 
     Telemetry::sendPing(installId);
 
-    startTimer (60); // repaint screen every 60ms
+    startTimer (42); // ~23.8 fps; both 24 and 23.976 fps round to 42 ms
 }
 
 MainComponent::~MainComponent()
@@ -302,6 +342,10 @@ void MainComponent::prepareToPlay (int samplesPerBlockExpected, double sampleRat
 
     convolutionL.prepare(spec);
     convolutionR.prepare(spec);
+
+    loudnessNormalizer.prepare(sampleRate, samplesPerBlockExpected);
+    loudnessNormalizer.setEnabled(loudnessEnabled);
+    loudnessNormalizer.setTargets(loudTargetI, loudTargetLra, loudTargetTp);
 
     initializeISO226Filter(sampleRate);
 }
@@ -340,7 +384,6 @@ void MainComponent::getNextAudioBlock(const juce::AudioSourceChannelInfo& buffer
     {
         auto* out = bufferToFill.buffer->getWritePointer(ch, bufferToFill.startSample);
         juce::dsp::AudioBlock<float> block(*bufferToFill.buffer); // block contains all channels
-        float peak = 0.0f;
         if (ch == 0)
         {
             auto* in = bufferToFill.buffer->getReadPointer(4, bufferToFill.startSample);
@@ -351,8 +394,6 @@ void MainComponent::getNextAudioBlock(const juce::AudioSourceChannelInfo& buffer
                 juce::dsp::ProcessContextReplacing<float> context(singleChannelBlock);
                 convolutionL.process(context);
             }
-            for (int i = 0; i < bufferToFill.numSamples; ++i)
-                peak = std::max(peak, std::abs(out[i]));
         }
         else if (ch == 1)
         {
@@ -364,13 +405,25 @@ void MainComponent::getNextAudioBlock(const juce::AudioSourceChannelInfo& buffer
                 juce::dsp::ProcessContextReplacing<float> context(singleChannelBlock);
                 convolutionR.process(context);
             }
-            for (int i = 0; i < bufferToFill.numSamples; ++i)
-                peak = std::max(peak, std::abs(out[i]));
         }
         else
         {
             juce::FloatVectorOperations::clear(out, bufferToFill.numSamples);
         }
+    }
+
+    // Loudness normalization: input tap (post-ISO, pre-gain) -> gain -> output tap (pre-volume)
+    auto* outL = bufferToFill.buffer->getWritePointer(0, bufferToFill.startSample);
+    auto* outR = bufferToFill.buffer->getWritePointer(1, bufferToFill.startSample);
+    loudnessNormalizer.process(outL, outR, bufferToFill.numSamples);
+
+    // Master volume + output channel meters
+    for (int ch = 0; ch < 6; ++ch)
+    {
+        auto* out = bufferToFill.buffer->getWritePointer(ch, bufferToFill.startSample);
+        float peak = 0.0f;
+        for (int i = 0; i < bufferToFill.numSamples; ++i)
+            peak = std::max(peak, std::abs(out[i]));
         if (masterVolume < 1.0f && (ch == 0 || ch == 1))
         {
             juce::FloatVectorOperations::multiply(out, (float)masterVolume, bufferToFill.numSamples);
@@ -688,6 +741,52 @@ void MainComponent::paint (juce::Graphics& g)
         g.setColour(juce::Colours::orange);
         g.strokePath(curvePath, juce::PathStrokeType(1.5f));
     }
+
+    // Loudness normalization block (bottom-right blank area)
+    {
+        const int x0 = 430, xMid = 675, x1 = 935;
+        const int leftRuleX = 426;
+        const int topY = 404, hRuleY = 501, bottomY = 534;
+
+        g.setColour(juce::Colours::grey.withAlpha(0.5f));
+        g.drawLine((float)leftRuleX, (float)topY, (float)leftRuleX, (float)bottomY, 1.0f);
+        g.drawLine((float)xMid, (float)topY, (float)xMid, (float)hRuleY, 1.0f);
+        g.drawLine((float)x0, (float)hRuleY, (float)x1, (float)hRuleY, 1.0f);
+
+        g.setFont(juce::Font(juce::FontOptions(12.0f)));
+        g.setColour(juce::Colours::lightgrey);
+        g.drawText("INPUT", 438, 404, 232, 16, juce::Justification::left);
+        g.drawText("OUTPUT", 682, 404, 250, 16, juce::Justification::left);
+
+        auto drawStat = [&](const char* name, float v, const char* unit,
+                            int x, int y, int nameW, int valRight)
+        {
+            g.setColour(juce::Colours::grey);
+            g.drawText(name, x, y, nameW, 18, juce::Justification::left);
+            juce::String text = "--";
+            if (v > -200.0f)
+                text = juce::String(v, 1) + " " + unit;
+            g.setColour(juce::Colours::white);
+            g.drawText(text, x + nameW, y, valRight - (x + nameW), 18, juce::Justification::right);
+        };
+
+        const int rowY[4] = { 422, 442, 462, 482 };
+        drawStat("M",   loudInM,   "LUFS", 438, rowY[0], 36, 668);
+        drawStat("I",   loudInI,   "LUFS", 438, rowY[1], 36, 668);
+        drawStat("LRA", loudInLra, "LU",   438, rowY[2], 36, 668);
+        drawStat("TP",  loudInTp,  "dBTP", 438, rowY[3], 36, 668);
+
+        drawStat("M",   loudOutM,   "LUFS", 682, rowY[0], 36, 930);
+        drawStat("I",   loudOutI,   "LUFS", 682, rowY[1], 36, 930);
+        drawStat("LRA", loudOutLra, "LU",   682, rowY[2], 36, 930);
+        drawStat("TP",  loudOutTp,  "dBTP", 682, rowY[3], 36, 930);
+
+        g.setFont(juce::Font(juce::FontOptions(9.0f)));
+        g.setColour(juce::Colours::grey);
+        g.drawText("I",   430, 503, 95, 10, juce::Justification::left);
+        g.drawText("LRA", 528, 503, 95, 10, juce::Justification::left);
+        g.drawText("TP",  626, 503, 95, 10, juce::Justification::left);
+    }
 }
 
 void MainComponent::resized()
@@ -732,16 +831,18 @@ void MainComponent::resized()
     sourceLearnBtn.setBounds(actualKnobX + knobSize + S(4), knobY + S(30), S(28), S(20));
     targetLearnBtn.setBounds(tgtKnobX + knobSize + S(4), knobY + S(30), S(28), S(20));
 
-    int rightX = tgtKnobX + knobSize + S(40);
-    midiDeviceLabel.setBounds(rightX, titleY, S(180), S(14));
-    midiDeviceCombo.setBounds(rightX, titleY + S(14), S(180), S(18));
     bypassToggle.setBounds(S(8), getHeight() - S(22) - S(4), S(84), S(22));
 
-    int logoSize = S(110);
-    int logoX = (rightX + S(180) + volKnobX - logoSize) / 2;
-    int logoY = knobY - S(46);
-    meaderyLogo.setBounds(logoX, logoY, logoSize, logoSize);
-    meaderyLabel.setBounds(logoX - S(40), logoY + logoSize - S(3), logoSize + S(80), S(22));
+    loudnessLnf.fontHeight = 11.0f * uiScale;
+    targetISlider.sendLookAndFeelChange();
+    targetLraSlider.sendLookAndFeelChange();
+    targetTpSlider.sendLookAndFeelChange();
+
+    targetISlider.setBounds(S(430), S(511), S(95), S(22));
+    targetLraSlider.setBounds(S(528), S(511), S(95), S(22));
+    targetTpSlider.setBounds(S(626), S(511), S(95), S(22));
+    loudnessToggle.setBounds(S(732), S(511), S(104), S(22));
+    loudnessResetButton.setBounds(S(846), S(511), S(88), S(22));
 
     int btnSize = S(20);
     int btnTop = S(8);
@@ -768,10 +869,8 @@ void MainComponent::resized()
     actualTitle.setFont(fontOpts);
     targetTitle.setFont(fontOpts);
     phonUnitLabel.setFont(fontOpts);
-    midiDeviceLabel.setFont(fontOpts);
     volumeLabel.setFont(fontOpts);
     volumeTitle.setFont(fontOpts);
-    meaderyLabel.setFont(juce::FontOptions(17.0f * uiScale).withStyle("Bold"));
 }
 
 void MainComponent::mouseDown(const juce::MouseEvent& event)
@@ -805,7 +904,59 @@ bool MainComponent::keyPressed(const juce::KeyPress& key)
 void MainComponent::timerCallback()
 {
     updateSpectrum();
+    updateLoudnessReadouts();
     repaint();
+}
+
+void MainComponent::updateLoudnessReadouts()
+{
+    const auto& in = loudnessNormalizer.getInputMeter();
+    const auto& out = loudnessNormalizer.getOutputMeter();
+
+    loudInM = in.getMomentaryLufs();
+    loudInI = in.getIntegratedLufs();
+    loudInLra = in.getLoudnessRange();
+    loudInTp = in.getTruePeakDb();
+
+    loudOutM = out.getMomentaryLufs();
+    loudOutI = out.getIntegratedLufs();
+    loudOutLra = out.getLoudnessRange();
+    loudOutTp = out.getTruePeakDb();
+
+    loudGainDb = loudnessNormalizer.getAppliedGainDb();
+}
+
+void MainComponent::resetLoudness()
+{
+    loudnessNormalizer.reset();
+    loudInM = loudInI = loudInLra = loudInTp = LoudnessMeter::invalidValue;
+    loudOutM = loudOutI = loudOutLra = loudOutTp = LoudnessMeter::invalidValue;
+    repaint();
+}
+
+void MainComponent::openMidiDevice(const juce::String& identifier)
+{
+    for (auto& d : juce::MidiInput::getAvailableDevices())
+    {
+        if (d.identifier != identifier)
+            continue;
+
+        if (d.name != lastMidiDeviceName)
+        {
+            spdlog::info("MIDI device found: {}", d.name.toStdString());
+            lastMidiDeviceName = d.name;
+        }
+
+        midiInput.reset();
+        midiInput = juce::MidiInput::openDevice(d.identifier, this);
+        if (midiInput)
+            midiInput->start();
+
+        selectedMidiDeviceId = d.identifier;
+        appProperties.getUserSettings()->setValue("midiDeviceId", d.identifier);
+        appProperties.saveIfNeeded();
+        return;
+    }
 }
 
 void MainComponent::handleIncomingMidiMessage(juce::MidiInput*, const juce::MidiMessage& message)
